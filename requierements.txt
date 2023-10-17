@@ -1,6 +1,9 @@
+cmocean
 dask
 matplotlib
 numpy
 pandas
+rich
 seaborn
+tqdm
 xarray
