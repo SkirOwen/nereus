@@ -140,6 +140,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 
 def main():
 	download_itp(main_url=URL)
+	extract_all_itps(get_itp_dir(), get_itp_extracted_dir())
 
 
 if __name__ == "__main__":
