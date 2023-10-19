@@ -65,7 +65,7 @@ def _get_response(url: str) -> HTTPResponse:
 	return response
 
 
-def url_download(url: str, path: str, task: int = 1, total: int = 1) -> None:
+def _url_download(url: str, path: str, task: int = 1, total: int = 1) -> None:
 	"""
 	Download an url to a local file
 
@@ -112,7 +112,7 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 
 			if not os.path.exists(target_path) or override:
 				# TODO: when file present it should only skip if checksum matches, if checksum_check is done
-				pool.submit(url_download, url, target_path, task, total=len(urls))
+				pool.submit(_url_download, url, target_path, task, total=len(urls))
 			else:
 				logger.info(f"Skipping {filename} as already present in {root}")
 
