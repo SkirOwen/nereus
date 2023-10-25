@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import os.path
 import shutil
 import ssl
@@ -136,6 +137,60 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 			itp_filepath = os.path.join(itp_dir, itp)
 			pool.submit(extract_itp, itp_filepath, target_dir)
 		logger.info("All ITPs have been extracted.")
+
+
+def itp_parser(filepath) -> tuple[dict, dict]:
+	"""
+	Parse data from an ITP file.
+
+	This function reads data from the specified ITP file and extracts both metadata
+	and data values.
+
+	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
+	and data starting from the fourth line until the end.
+
+	Parameters
+	----------
+	filepath : str
+		The path to the ITP file to be parsed.
+
+	Returns
+	-------
+	tuple of dict and dict
+		A tuple containing two dictionaries:
+			- The first dictionary contains the parsed data values, where keys are variable names
+			and values are lists of corresponding data points.
+			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
+	"""
+
+	with open(filepath, "r") as f:
+		lines = f.readlines()
+
+	# Line 0 and 1 stores the metadata
+	metadata_names = lines[0].split()
+	metadata_values = list(map(ast.literal_eval, lines[1].split()))
+	# casting the float values of the metadata to floats as they are stored in str
+
+	metadata = {
+		"name": f"{metadata_names[0][1:]}_{metadata_names[1][:-1]}",
+		"profile": metadata_names[3][:-1],
+	}
+	metadata.update(zip(metadata_names[4:], metadata_values))
+
+	# The name of the variables are stored on line 2
+	data_names = lines[2][1:].split()
+	data = dict.fromkeys(data_names, [])
+
+	# The data start at line 3
+	# Line -1 is an eof tag, so ignoring it
+	for line in lines[3:-1]:
+		values = list(map(ast.literal_eval, line.split()))
+		for name, val in zip(data_names, values):
+			data[name].append(val)
+
+	return data, metadata
+
+
 
 
 def main():
