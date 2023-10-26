@@ -1,5 +1,6 @@
 cmocean
 dask
+ipython
 matplotlib
 numpy
 pandas
