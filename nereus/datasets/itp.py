@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import ast
+import concurrent.futures
+import glob
 import os.path
+import re
 import shutil
 import ssl
 import urllib.request
 
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
 
+import numpy as np
 from tqdm import tqdm
 
 from nereus import logger
@@ -139,7 +144,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 		logger.info("All ITPs have been extracted.")
 
 
-def itp_parser(filepath) -> tuple[dict, dict]:
+def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 	"""
 	Parse data from an ITP file.
 
@@ -167,13 +172,15 @@ def itp_parser(filepath) -> tuple[dict, dict]:
 		lines = f.readlines()
 
 	# Line 0 and 1 stores the metadata
-	metadata_names = lines[0].split()
+	metadata_names = re.sub(r"[%:,]", "", lines[0]).split()
+	# Using re to remove the "%", ":", "," character form the string
 	metadata_values = list(map(ast.literal_eval, lines[1].split()))
 	# casting the float values of the metadata to floats as they are stored in str
 
 	metadata = {
-		"name": f"{metadata_names[0][1:]}_{metadata_names[1][:-1]}",
-		"profile": metadata_names[3][:-1],
+		"file": os.path.basename(filepath),
+		"name": f"{metadata_names[0]}_{metadata_names[1]}",
+		"profile": metadata_names[3],
 	}
 	metadata.update(zip(metadata_names[4:], metadata_values))
 
@@ -184,18 +191,45 @@ def itp_parser(filepath) -> tuple[dict, dict]:
 	# The data start at line 3
 	# Line -1 is an eof tag, so ignoring it
 	for line in lines[3:-1]:
-		values = list(map(ast.literal_eval, line.split()))
+		# values = list(map(ast.literal_eval, line.split()))
+		values = np.fromstring(line, sep="\t")
 		for name, val in zip(data_names, values):
 			data[name].append(val)
 
+	if progress_bar is not None:
+		progress_bar.update(1)
 	return data, metadata
 
 
+def itps_to_df() -> tuple:
+	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
+	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
+	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
+	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
+	logger.info(f"Found {len(files)} to parse")
+
+	metadatas = []
+	itps = []
+	# with ThreadPoolExecutor() as pool:
+	# 	with tqdm(total=len(files)) as progress_bar:
+	# 		futures = {pool.submit(itp_parser, file, progress_bar): file for file in files}
+	# 		for future in concurrent.futures.as_completed(futures):
+	# 			data, metadata = future.result()
+	# 			itps.append(data)
+	# 			metadatas.append(metadata)
+
+	with Pool() as pool:
+		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files)):
+			itps.append(data)
+			metadatas.append(metadata)
+
+	return itps, metadatas
 
 
 def main():
-	download_itp(main_url=URL)
-	extract_all_itps(get_itp_dir(), get_itp_extracted_dir())
+	# download_itp(main_url=URL)
+	# extract_all_itps(get_itp_dir(), get_itp_extracted_dir())
+	itps_to_df()
 
 
 if __name__ == "__main__":
