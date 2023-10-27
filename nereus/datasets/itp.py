@@ -14,6 +14,8 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
 import numpy as np
+import polars as pl
+
 from tqdm import tqdm
 
 from nereus import logger
@@ -196,7 +198,7 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 
 	metadata.update(zip(attribute_names, metadata_values))
 
-	metadata["time"] = np.datetime64(
+	metadata["time"] = (
 		datetime.datetime(year=metadata["year"], month=1, day=1) +
 		datetime.timedelta(days=metadata["day"] - 1)    # -1 because Jan 1st is day 1.0000
 	)
@@ -218,12 +220,12 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 	return data, metadata
 
 
-def itps_to_df() -> tuple:
+def parser_all_itp() -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
 	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
-	logger.info(f"Found {len(files)} to parse")
+	logger.info(f"Found {len(files)} ITPs to parse")
 
 	metadatas = []
 	itps = []
@@ -241,6 +243,23 @@ def itps_to_df() -> tuple:
 			metadatas.append(metadata)
 
 	return itps, metadatas
+
+
+def itp_to_df(save_df: bool = True, regenerate: bool = False):
+	# TODO: backend option to choose pandas vs polars
+	if regenerate:
+		itps, metadatas = parser_all_itp()
+
+	df_itps = pl.DataFrame(itps)
+	df_metadatas = pl.DataFrame(metadatas)
+
+	if save_df:
+		df_itps.write_ipc("test")
+		df_itps.write_parquet("test")
+
+	# TODO: pandas does not parser the dict correctly
+	# itps is a list of dict, and pandas parsers it and puts list in columns
+	# need to try with poloars and on a smaller example
 
 
 def main():
