@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import datetime
 import concurrent.futures
 import glob
 import os.path
@@ -20,6 +21,7 @@ from nereus import logger
 from nereus.utils.downloader import downloader
 from nereus.utils.file_ops import calculate_md5
 from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir
+from nereus.utils.iterable_ops import skipwise
 
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
@@ -167,22 +169,37 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 			and values are lists of corresponding data points.
 			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
 	"""
+	metadata = {
+		"file": os.path.basename(filepath),
+		"source": "ITP",
+	}
 
 	with open(filepath, "r") as f:
 		lines = f.readlines()
 
+	# the header of the metadata is in two parts separated by a colon
+	# the left part follows this:
+	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
+	# the right part this one:
+	# NAME NAME NAME NAME
+	instrument_info, attribute_names = lines[0].split(":")
+
 	# Line 0 and 1 stores the metadata
-	metadata_names = re.sub(r"[%:,]", "", lines[0]).split()
 	# Using re to remove the "%", ":", "," character form the string
+	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
+
+	metadata.update(skipwise(instrument_info, step=2))
+
+	attribute_names = re.sub(r"[%,]", "", attribute_names).split()
 	metadata_values = list(map(ast.literal_eval, lines[1].split()))
 	# casting the float values of the metadata to floats as they are stored in str
 
-	metadata = {
-		"file": os.path.basename(filepath),
-		"name": f"{metadata_names[0]}_{metadata_names[1]}",
-		"profile": metadata_names[3],
-	}
-	metadata.update(zip(metadata_names[4:], metadata_values))
+	metadata.update(zip(attribute_names, metadata_values))
+
+	metadata["time"] = np.datetime64(
+		datetime.datetime(year=metadata["year"], month=1, day=1) +
+		datetime.timedelta(days=metadata["day"] - 1)    # -1 because Jan 1st is day 1.0000
+	)
 
 	# The name of the variables are stored on line 2
 	data_names = lines[2][1:].split()
