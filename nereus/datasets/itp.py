@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
 import numpy as np
+import pandas as pd
 import polars as pl
 
 from tqdm import tqdm
@@ -215,8 +216,11 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 		for name, val in zip(data_names, values):
 			data[name].append(val)
 
+	data["file"] = os.path.basename(filepath)
+
 	if progress_bar is not None:
 		progress_bar.update(1)
+
 	return data, metadata
 
 
@@ -239,19 +243,21 @@ def parser_all_itp() -> tuple:
 
 	with Pool() as pool:
 		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files)):
-			itps.append(data)
+			itps.append(pd.DataFrame(data))
 			metadatas.append(metadata)
 
 	return itps, metadatas
 
 
-def itp_to_df(save_df: bool = True, regenerate: bool = False):
+def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	# TODO: backend option to choose pandas vs polars
 	if regenerate:
 		itps, metadatas = parser_all_itp()
 
-	df_itps = pl.DataFrame(itps)
 	df_metadatas = pl.DataFrame(metadatas)
+	# Add the itps to dataframe here
+
+	# final_df = pd.concat([pd.DataFrame.from_dict(itp) for itp in itps], ignore_index=True)
 
 	if save_df:
 		df_itps.write_ipc("test")
