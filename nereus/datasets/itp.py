@@ -206,7 +206,7 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 
 	# The name of the variables are stored on line 2
 	data_names = lines[2][1:].split()
-	data = dict.fromkeys(data_names, [])
+	data = {name: [] for name in data_names}
 
 	# The data start at line 3
 	# Line -1 is an eof tag, so ignoring it
