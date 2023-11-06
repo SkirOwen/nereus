@@ -275,6 +275,13 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	# need to try with poloars and on a smaller example
 
 
+def query_from_metadata(query: str) -> list:
+	# load metadata file
+	# find file names to load
+	# delay load
+	pass
+
+
 def main():
 	# download_itp(main_url=URL)
 	# extract_all_itps(get_itp_dir(), get_itp_extracted_dir())
