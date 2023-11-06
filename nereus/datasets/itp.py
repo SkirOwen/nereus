@@ -217,6 +217,8 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 			data[name].append(val)
 
 	data["file"] = os.path.basename(filepath)
+	if "nobs" in data_names:
+		data["nobs"] = list(map(int, data["nobs"]))
 
 	if progress_bar is not None:
 		progress_bar.update(1)
@@ -224,12 +226,16 @@ def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
 	return data, metadata
 
 
-def parser_all_itp() -> tuple:
+def parser_all_itp(limit: int = None) -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
 	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
 	logger.info(f"Found {len(files)} ITPs to parse")
+
+	if limit is not None and limit <= len(files):
+		logger.info(f"Only parsing {limit} files")
+		files = files[:limit]
 
 	metadatas = []
 	itps = []
@@ -242,8 +248,8 @@ def parser_all_itp() -> tuple:
 	# 			metadatas.append(metadata)
 
 	with Pool() as pool:
-		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files)):
-			itps.append(pd.DataFrame(data))
+		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
+			itps.append(data)
 			metadatas.append(metadata)
 
 	return itps, metadatas
@@ -264,6 +270,7 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 		df_itps.write_parquet("test")
 
 	# TODO: pandas does not parser the dict correctly
+	# TODO: have option to load a small batch of the data to test things
 	# itps is a list of dict, and pandas parsers it and puts list in columns
 	# need to try with poloars and on a smaller example
 
