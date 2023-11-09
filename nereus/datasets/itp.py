@@ -279,6 +279,10 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	return df_itps, df_metadatas
 
 
+def load_itp():
+	pass
+
+
 def query_from_metadata(query: str) -> list:
 	# load metadata file
 	# find file names to load
