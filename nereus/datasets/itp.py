@@ -279,8 +279,18 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	return df_itps, df_metadatas
 
 
-def load_itp():
-	pass
+def load_itp(regenerate: bool = False):
+	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
+	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+
+	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
+
+	if regenerate or not cache_exist:
+		itps_to_df()
+
+	df_itps = pl.read_parquet(itps_filepath)
+	df_metadatas = pl.read_csv(metadata_filepath)
+	return df_itps, df_metadatas
 
 
 def query_from_metadata(query: str) -> list:
