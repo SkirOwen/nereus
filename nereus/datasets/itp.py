@@ -256,23 +256,35 @@ def parser_all_itp(limit: int = None) -> tuple:
 
 
 def itps_to_df(save_df: bool = True, regenerate: bool = False):
+	""""""
+	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
+	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+
+	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
+
 	# TODO: backend option to choose pandas vs polars
-	if regenerate:
+	if regenerate or not cache_exist:
 		itps, metadatas = parser_all_itp()
 
-	df_metadatas = pl.DataFrame(metadatas)
+		df_metadatas = pl.DataFrame(metadatas)
+		logger.info("Converting ITPs to dataframe")
+		df_itps = pl.concat([pl.DataFrame(itp) for itp in tqdm(itps, desc="Itps")], how="diagonal")
+		if save_df:
+			logger.info("Saving to file")
+			df_itps.write_parquet(itps_filepath)
+			df_metadatas.write_csv(metadata_filepath)
+
+	else:
+		df_itps = pl.read_parquet(itps_filepath)
+		df_metadatas = pl.read_csv(metadata_filepath)
+
 	# Add the itps to dataframe here
-
 	# final_df = pd.concat([pd.DataFrame.from_dict(itp) for itp in itps], ignore_index=True)
-
-	if save_df:
-		df_itps.write_ipc("test")
-		df_itps.write_parquet("test")
-
 	# TODO: pandas does not parser the dict correctly
 	# TODO: have option to load a small batch of the data to test things
 	# itps is a list of dict, and pandas parsers it and puts list in columns
 	# need to try with poloars and on a smaller example
+	return df_itps, df_metadatas
 
 
 def query_from_metadata(query: str) -> list:
