@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import datetime
-import concurrent.futures
 import glob
 import os.path
 import re
@@ -14,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
 import numpy as np
-import pandas as pd
 import polars as pl
 
 from tqdm import tqdm
