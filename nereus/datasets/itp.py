@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import datetime
-import concurrent.futures
 import glob
 import os.path
 import re
@@ -14,7 +13,6 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
 import numpy as np
-import pandas as pd
 import polars as pl
 
 from tqdm import tqdm
@@ -278,12 +276,20 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 		df_itps = pd.read_parquet(itps_filepath)
 		df_metadatas = pd.read_csv(metadata_filepath)
 
-	# Add the itps to dataframe here
-	# final_df = pd.concat([pd.DataFrame.from_dict(itp) for itp in itps], ignore_index=True)
-	# TODO: pandas does not parser the dict correctly
-	# TODO: have option to load a small batch of the data to test things
-	# itps is a list of dict, and pandas parsers it and puts list in columns
-	# need to try with poloars and on a smaller example
+	return df_itps, df_metadatas
+
+
+def load_itp(regenerate: bool = False):
+	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
+	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+
+	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
+
+	if regenerate or not cache_exist:
+		itps_to_df()
+
+	df_itps = pl.read_parquet(itps_filepath)
+	df_metadatas = pl.read_csv(metadata_filepath)
 	return df_itps, df_metadatas
 
 
@@ -295,8 +301,6 @@ def query_from_metadata(query: str) -> list:
 
 
 def main():
-	# download_itp(main_url=URL)
-	# extract_all_itps(get_itp_dir(), get_itp_extracted_dir())
 	itps_to_df()
 
 

@@ -1,3 +1,4 @@
+cartopy
 cmocean
 dask
 ipython

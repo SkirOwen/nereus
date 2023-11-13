@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os.path
 import urllib.request
 import urllib.error
@@ -9,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPResponse
 from tqdm.auto import tqdm
 
-from typing import Iterable, Generator, Sequence
+from typing import Generator, Sequence
 
 from nereus import logger
 
@@ -41,7 +40,6 @@ def _get_response(url: str) -> HTTPResponse:
 	try:
 		response = urllib.request.urlopen(url)
 	except urllib.error.HTTPError:
-		import base64
 		from http.cookiejar import CookieJar
 		cj = CookieJar()
 		opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
