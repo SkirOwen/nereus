@@ -275,8 +275,8 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 			df_metadatas.write_csv(metadata_filepath)
 
 	else:
-		df_itps = pl.read_parquet(itps_filepath)
-		df_metadatas = pl.read_csv(metadata_filepath)
+		df_itps = pd.read_parquet(itps_filepath)
+		df_metadatas = pd.read_csv(metadata_filepath)
 
 	# Add the itps to dataframe here
 	# final_df = pd.concat([pd.DataFrame.from_dict(itp) for itp in itps], ignore_index=True)
