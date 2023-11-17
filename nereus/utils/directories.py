@@ -17,3 +17,8 @@ def get_itp_dir() -> str:
 def get_itp_extracted_dir() -> str:
 	"""./data/itp/extracted"""
 	return guarantee_existence(os.path.join(get_itp_dir(), "extracted"))
+
+
+def get_udash_dir() -> str:
+	"""./data/udash"""
+	return guarantee_existence(os.path.join(get_data_dir(), "udash"))
