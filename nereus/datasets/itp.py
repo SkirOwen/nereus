@@ -148,7 +148,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 		logger.info("All ITPs have been extracted.")
 
 
-def itp_parser(filepath, progress_bar=None) -> tuple[dict, dict]:
+def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	"""
 	Parse data from an ITP file.
 
