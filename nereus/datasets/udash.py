@@ -36,20 +36,32 @@ def _udash_fileparser(filepath: str):
 		for line in f:
 			lines.append(line)
 
-	data = {key: [] for key in lines[0]}
+	keys = []
+	for v in lines[0]:
+		if "Temp" in v:
+			v = "Temp[C]"
+		elif v == "QF":
+			v = f"QF_{keys[-1]}"
+		keys.append(v)
+
+	data = {key: [] for key in keys}
 
 	for line in tqdm(lines[1:]):
 		for i, v in enumerate(line):
-			key = lines[0][i]
+			key = keys[i]
 			if key == "yyyy-mm-ddThh:mm":
 				v = datetime.fromisoformat(v)
-			elif v.isdigit():
-				v = int(v)
-			else:
-				try:
+			elif v.replace('.', '', 1).isdigit():  # Check if the value is numeric
+				if '.' in v:
+					v = float(v)  # Convert to float if decimal
+				else:
+					v = int(v)  # Convert to int if whole number
+
+			elif v.lstrip('-').replace('.', '', 1).isdigit():  # Check for negative numbers
+				if '.' in v:
 					v = float(v)
-				except ValueError:
-					continue
+				else:
+					v = int(v)
 			data[key].append(v)
 
 
