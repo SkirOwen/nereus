@@ -118,7 +118,7 @@ def download_itp(main_url: str, files: None | list[str] = None, override: bool =
 	downloader(urls, itp_dir, override=override)
 
 
-def extract_itp(file: str, target_directory: None | str = None) -> None:
+def _extract_itp(file: str, target_directory: None | str = None) -> None:
 	"""
 
 	Parameters
@@ -143,7 +143,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 	with ThreadPoolExecutor(max_workers=4) as pool:
 		for task, itp in enumerate(tqdm(all_itps)):
 			itp_filepath = os.path.join(itp_dir, itp)
-			pool.submit(extract_itp, itp_filepath, target_dir)
+			pool.submit(_extract_itp, itp_filepath, target_dir)
 		logger.info("All ITPs have been extracted.")
 
 
