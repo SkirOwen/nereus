@@ -14,6 +14,7 @@ from multiprocessing import Pool
 
 import numpy as np
 import polars as pl
+import pandas as pd
 
 from tqdm import tqdm
 
