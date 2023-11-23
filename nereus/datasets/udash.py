@@ -8,6 +8,7 @@ from datetime import datetime, date
 from multiprocessing import Pool
 
 import pandas as pd
+import polars as pl
 from tqdm import tqdm
 
 from nereus import logger
@@ -23,9 +24,9 @@ def download_udash(url: str, override: bool = False) -> None:
 	downloader(url, udash_dir, override=override)
 
 
-def _extract_udash(file: str) -> None:
+def _extract_udash(file: None | str = None) -> None:
 	udash_dir = get_udash_dir()
-	logger.debug("Extracting UDASH.")
+	logger.info("Extracting UDASH.")
 
 	shutil.unpack_archive(
 		filename=os.path.join(udash_dir, "UDASH.zip"),
@@ -60,35 +61,41 @@ def _udash_fileparser(filepath: str):
 					try:
 						v = datetime.fromisoformat(v)
 					except ValueError:
-						continue
+						pass
 			else:
 				v = str2num(v)
 			data[key].append(v)
 	return data
 
 
-def parse_udash(files: None | list[str] = None):
+def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 	udash_extracted_dir = get_udash_extracted_dir()
 	if files is None:
-		files = glob.glob(os.path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+
+	if files_nbr is not None:
+		files = files[:files_nbr]
+
 	logger.info(f"{len(files)} udash files to parse.")
 
 	udash = []
 	# for f in tqdm(files):
-	# 	udash.append(_udash_fileparser(f))
+	# 	dd = _udash_fileparser(f)
+	# 	udash.append(dd)
+	# 	# print(pd.DataFrame(dd).info())
 
 	with Pool() as pool:
 		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
-			udash.append(data)
+			udash.append(pl.DataFrame(data))
+	logger.info("Merging dataframe")
+	df = pl.concat(udash, how="diagonal")
 
-	for u in udash:
-		df = pd.concat(pd.DataFrame(u))
-
-	df.to_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
-
+	df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
 
 
 def main():
+	# download_udash(URL)
+	# _extract_udash()
 	parse_udash()
 
 

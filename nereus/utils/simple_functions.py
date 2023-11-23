@@ -30,10 +30,16 @@ def str2num(s: str) -> int | float | str:
 	If the string is an integer number then convert to int.
 	If the string is a decimal then convert to float.
 	"""
-	is_number = s.lstrip('-').replace('.', '', 1).isdigit()
-	if is_number and not (s.startswith("0") and s != "0"):
-		if '.' in s:
-			s = float(s)
-		else:
+	# is_number = s.lstrip('-').replace('.', '', 1).isdigit()
+	# if is_number and not (s.startswith("0") and s != "0"):
+	# 	if '.' in s:
+	# 		s = float(s)
+	# 	else:
+	# 		s = int(s)
+	try:
+		s = float(s)
+		if s.is_integer():
 			s = int(s)
+	except ValueError:
+		pass
 	return s
