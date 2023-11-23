@@ -22,3 +22,8 @@ def get_itp_extracted_dir() -> str:
 def get_udash_dir() -> str:
 	"""./data/udash"""
 	return guarantee_existence(os.path.join(get_data_dir(), "udash"))
+
+
+def get_udash_extracted_dir() -> str:
+	"""./data/udash/UDASH"""
+	return guarantee_existence(os.path.join(get_udash_dir(), "UDASH"))

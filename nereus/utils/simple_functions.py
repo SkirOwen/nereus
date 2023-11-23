@@ -36,5 +36,4 @@ def str2num(s: str) -> int | float | str:
 			s = float(s)
 		else:
 			s = int(s)
-
 	return s
