@@ -109,6 +109,7 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 	# 		udash.append(pl.DataFrame(data))
 	logger.info("Merging dataframe")
 	df = pl.concat(udash, how="diagonal")
+	df = convert_type(df)
 
 	df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
 	return df
@@ -117,16 +118,17 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 def convert_type(df: pl.DataFrame):
 	col = df.columns
 
-	for c, c_type in zip(col, UDASH_COLUMN_TYPE):
-		if c == "yyyy-mm-ddThh:mm":
-			pass
-
+	for c, c_type in zip(col, UDASH_COLUMN_TYPE.values()):
+		print(c_type)
+		if c != "yyyy-mm-ddThh:mm":
+			df = df.with_columns(pl.col(c).cast(c_type))
+	return df
 
 
 def main():
 	# download_udash(URL)
 	# _extract_udash()
-	parse_udash(files_nbr=10)
+	parse_udash()
 
 
 if __name__ == "__main__":
