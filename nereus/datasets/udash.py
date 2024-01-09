@@ -24,7 +24,7 @@ UDASH_COLUMN_TYPE = {
 	'Station': str,
 	'Platform': str,
 	'Type': str,
-	'yyyy-mm-ddThh:mm': str,
+	'yyyy-mm-ddThh:mm': datetime,
 	'Longitude_[deg]': float,
 	'Latitude_[deg]': float,
 	'Pressure_[dbar]': float,
@@ -84,8 +84,7 @@ def _udash_fileparser(filepath: str):
 						v = datetime.fromisoformat(v)
 					except ValueError:
 						pass
-			else:
-				data[key].append(v)
+			data[key].append(v)
 	return data
 
 
@@ -100,24 +99,34 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 	logger.info(f"{len(files)} udash files to parse.")
 
 	udash = []
-	# for f in tqdm(files):
-	# 	dd = _udash_fileparser(f)
-	# 	udash.append(dd)
-	# 	# print(pd.DataFrame(dd).info())
+	for f in tqdm(files):
+		dd = _udash_fileparser(f)
+		udash.append(pl.DataFrame(dd))
+		# print(pd.DataFrame(dd).info())
 
-	with Pool() as pool:
-		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
-			udash.append(pl.DataFrame(data))
+	# with Pool() as pool:
+	# 	for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
+	# 		udash.append(pl.DataFrame(data))
 	logger.info("Merging dataframe")
 	df = pl.concat(udash, how="diagonal")
 
 	df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
+	return df
+
+
+def convert_type(df: pl.DataFrame):
+	col = df.columns
+
+	for c, c_type in zip(col, UDASH_COLUMN_TYPE):
+		if c == "yyyy-mm-ddThh:mm":
+			pass
+
 
 
 def main():
 	# download_udash(URL)
 	# _extract_udash()
-	parse_udash()
+	parse_udash(files_nbr=10)
 
 
 if __name__ == "__main__":
