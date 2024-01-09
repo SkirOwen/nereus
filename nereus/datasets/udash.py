@@ -18,6 +18,28 @@ from nereus.utils.simple_functions import str2num
 
 URL = "https://hs.pangaea.de/Projects/UDASH/UDASH.zip"
 
+UDASH_COLUMN_TYPE = {
+	'Prof_no': int,
+	'Cruise': str,
+	'Station': str,
+	'Platform': str,
+	'Type': str,
+	'yyyy-mm-ddThh:mm': str,
+	'Longitude_[deg]': float,
+	'Latitude_[deg]': float,
+	'Pressure_[dbar]': float,
+	'Depth_[m]': float,
+	'QF_Depth_[m]': int,
+	'Temp[C]': float,
+	'QF_Temp[C]': int,
+	'Salinity_[psu]': float,
+	'QF_Salinity_[psu]': int,
+	'Source': str,
+	'DOI': str,
+	'WOD-Cruise-ID': str,
+	'WOD-Cast-ID': str,
+}
+
 
 def download_udash(url: str, override: bool = False) -> None:
 	udash_dir = get_udash_dir()
@@ -63,8 +85,7 @@ def _udash_fileparser(filepath: str):
 					except ValueError:
 						pass
 			else:
-				v = str2num(v)
-			data[key].append(v)
+				data[key].append(v)
 	return data
 
 
