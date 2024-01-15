@@ -10,6 +10,7 @@ from multiprocessing import Pool
 import pandas as pd
 import polars as pl
 from tqdm import tqdm
+from rich.progress import track
 
 from nereus import logger
 from nereus.utils.downloader import downloader
@@ -99,7 +100,7 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 	logger.info(f"{len(files)} udash files to parse.")
 
 	udash = []
-	for f in tqdm(files):
+	for f in track(files, description="UDASH files parsing"):
 		dd = _udash_fileparser(f)
 		udash.append(pl.DataFrame(dd))
 		# print(pd.DataFrame(dd).info())
