@@ -117,7 +117,9 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 
 def convert_type(df: pl.DataFrame):
 	col = df.columns
-
+	# TODO: can just hard-code the column I want to change, instead of getting the column from the df
+	# Though, what if one column does not exist, it would return an error
+	# now still the same issue but it just assumed it is matching with UDASH_COLUMN_TYPE
 	for c, c_type in zip(col, UDASH_COLUMN_TYPE.values()):
 		print(c_type)
 		if c != "yyyy-mm-ddThh:mm":
