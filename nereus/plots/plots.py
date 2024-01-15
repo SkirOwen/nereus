@@ -14,6 +14,8 @@ import cartopy.crs as ccrs
 from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
+from nereus.datasets import load_udash, load_itp
+
 
 def map_itps(itps_lat_lon: list):
 	lat, lon = itps_lat_lon
@@ -35,7 +37,7 @@ def map_itps(itps_lat_lon: list):
 def map_udash(udash):
 	logger.info("Removing duplicate location and time")
 	# TODO: could have the number with size?
-	dt_udash = udash.drop_duplicates(["Latitude_[deg]", "Longitude_[deg]", "yyyy-mm-ddThh:mm"])
+	dt_udash = udash.drop_duplicates(["Latitude_[deg]", "Longitude_[deg]", "yyyy-mm-ddThh:mm"]).sort_index()
 
 	fig = plt.figure(figsize=(10, 10), dpi=300)
 	ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
@@ -60,21 +62,24 @@ def map_udash(udash):
 
 
 def udash_depth_hist(udash):
+	logger.info("Plotting depth histogram")
 	sns.displot(udash, x="Depth_[m]")
-	plt.savefig(os.path.join(get_plot_dir(),"./plots/udash_depth_hist.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), "udash_depth_hist.png"), dpi=1000)
 	plt.show()
 
 
 def udash_time_hist(udash):
+	logger.info("Plotting date hist")
 	sns.displot(udash, x="yyyy-mm-ddThh:mm")
-	plt.savefig(os.path.join(get_plot_dir(), "./plots/udash_time_hist.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), ".udash_time_hist.png"), dpi=1000)
 	plt.show()
 
 
 def udash_months_hist(udash):
+	logger.info("Plotting month hist")
 	udash_months = udash["yyyy-mm-ddThh:mm"].dt.month
 	sns.histplot(udash_months, discrete=True)
-	plt.savefig(os.path.join(get_plot_dir(), "./plots/udash_months_hist.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), "udash_months_hist.png"), dpi=1000)
 	plt.show()
 
 
@@ -96,7 +101,11 @@ def time_hist(metadatas) -> None:
 
 
 def main():
-	pass
+	udash = load_udash()
+	map_udash(udash)
+	udash_depth_hist(udash)
+	udash_months_hist(udash)
+	udash_time_hist(udash)
 
 
 if __name__ == "__main__":
