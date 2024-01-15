@@ -289,8 +289,8 @@ def load_itp(regenerate: bool = False):
 	if regenerate or not cache_exist:
 		itps_to_df()
 
-	df_itps = pl.read_parquet(itps_filepath)
-	df_metadatas = pl.read_csv(metadata_filepath)
+	df_itps = pd.read_parquet(itps_filepath)
+	df_metadatas = pd.read_csv(metadata_filepath)
 	return df_itps, df_metadatas
 
 
