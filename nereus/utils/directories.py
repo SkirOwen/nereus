@@ -27,3 +27,8 @@ def get_udash_dir() -> str:
 def get_udash_extracted_dir() -> str:
 	"""./data/udash/UDASH"""
 	return guarantee_existence(os.path.join(get_udash_dir(), "UDASH"))
+
+
+def get_plot_dir() -> str:
+	"""./plots"""
+	return guarantee_existence(os.path.join(get_nereus_dir(), "plots"))
