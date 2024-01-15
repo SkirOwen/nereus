@@ -127,6 +127,16 @@ def convert_type(df: pl.DataFrame):
 	return df
 
 
+def load_udash(regenerate: bool = False):
+	udash_filepath = os.path.join(get_udash_dir(), "udash.parquet")
+
+	if regenerate or not os.path.exists(udash_filepath):
+		parse_udash()
+
+	df = pd.read_parquet(udash_filepath)
+	return df
+
+
 def main():
 	# download_udash(URL)
 	# _extract_udash()
