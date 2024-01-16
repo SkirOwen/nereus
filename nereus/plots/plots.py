@@ -17,9 +17,7 @@ from nereus.utils.directories import get_plot_dir
 from nereus.datasets import load_udash, load_itp
 
 
-def map_itps(itps_lat_lon: list):
-	lat, lon = itps_lat_lon
-
+def get_arctic_map():
 	fig = plt.figure(figsize=(10, 10), dpi=300)
 	ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
 	ax.set_extent([-180, 180, 90, 55], ccrs.PlateCarree())
@@ -29,6 +27,13 @@ def map_itps(itps_lat_lon: list):
 	circle = mpath.Path(verts * radius + center)
 	ax.stock_img()
 	ax.set_boundary(circle, transform=ax.transAxes)
+	return fig, ax
+
+
+def map_itps(itps_lat_lon: list):
+	lat, lon = itps_lat_lon
+
+	fig, ax = get_arctic_map()
 
 	ax.scatter(lon, lat, transform=ccrs.PlateCarree())
 	plt.show()
@@ -39,15 +44,7 @@ def map_udash(udash):
 	# TODO: could have the number with size?
 	dt_udash = udash.drop_duplicates(["Latitude_[deg]", "Longitude_[deg]", "yyyy-mm-ddThh:mm"]).sort_index()
 
-	fig = plt.figure(figsize=(10, 10), dpi=300)
-	ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
-	ax.set_extent([-180, 180, 90, 55], ccrs.PlateCarree())
-	theta = np.linspace(0, 2 * np.pi, 100)
-	center, radius = [0.5, 0.5], 0.5
-	verts = np.vstack([np.sin(theta), np.cos(theta)]).T
-	circle = mpath.Path(verts * radius + center)
-	ax.stock_img()
-	ax.set_boundary(circle, transform=ax.transAxes)
+	fig, ax = get_arctic_map()
 
 	logger.info("Scatter plot, takes some time")
 	g = sns.scatterplot(data=dt_udash, x="Longitude_[deg]", y="Latitude_[deg]", hue="yyyy-mm-ddThh:mm", size=2, ax=ax, transform=ccrs.PlateCarree())
