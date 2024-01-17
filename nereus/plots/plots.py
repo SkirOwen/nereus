@@ -11,6 +11,8 @@ import seaborn as sns
 import cmocean as cm
 import cartopy.crs as ccrs
 
+from rich.console import Console
+
 from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
@@ -47,7 +49,17 @@ def map_udash(udash):
 	fig, ax = get_arctic_map()
 
 	logger.info("Scatter plot, takes some time")
-	g = sns.scatterplot(data=dt_udash, x="Longitude_[deg]", y="Latitude_[deg]", hue="yyyy-mm-ddThh:mm", size=2, ax=ax, transform=ccrs.PlateCarree())
+	with Console().status("Loading") as st:
+		g = sns.scatterplot(
+			data=dt_udash,
+			x="Longitude_[deg]",
+			y="Latitude_[deg]",
+			hue="yyyy-mm-ddThh:mm",
+			size=2,
+			ax=ax,
+			transform=ccrs.PlateCarree(),
+			markers="h",
+		)
 
 	logger.info("Removing legend")
 	g.legend_.remove()
@@ -60,7 +72,8 @@ def map_udash(udash):
 
 def udash_depth_hist(udash):
 	logger.info("Plotting depth histogram")
-	sns.displot(udash, x="Depth_[m]")
+	print(udash.columns)
+	sns.displot(udash, x="Temp[C]")
 	plt.savefig(os.path.join(get_plot_dir(), "udash_depth_hist.png"), dpi=1000)
 	plt.show()
 
@@ -68,7 +81,7 @@ def udash_depth_hist(udash):
 def udash_time_hist(udash):
 	logger.info("Plotting date hist")
 	sns.displot(udash, x="yyyy-mm-ddThh:mm")
-	plt.savefig(os.path.join(get_plot_dir(), ".udash_time_hist.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), "udash_time_hist.png"), dpi=1000)
 	plt.show()
 
 
@@ -99,10 +112,10 @@ def time_hist(metadatas) -> None:
 
 def main():
 	udash = load_udash()
-	map_udash(udash)
+	# map_udash(udash)
 	udash_depth_hist(udash)
-	udash_months_hist(udash)
-	udash_time_hist(udash)
+	# udash_months_hist(udash)
+	# udash_time_hist(udash)
 
 
 if __name__ == "__main__":
