@@ -67,7 +67,7 @@ def _udash_fileparser(filepath: str):
 	keys = []
 	for v in lines[0].split():
 		if "Temp" in v:
-			v = "Temp[C]"
+			v = "Temp_[C]"
 		elif v == "QF":
 			v = f"QF_{keys[-1]}"
 		keys.append(v)
