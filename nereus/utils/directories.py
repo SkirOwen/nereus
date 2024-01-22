@@ -29,6 +29,11 @@ def get_udash_extracted_dir() -> str:
 	return guarantee_existence(os.path.join(get_udash_dir(), "UDASH"))
 
 
+def get_argo_dir() -> str:
+	"""./data/argo"""
+	return guarantee_existence(os.path.join(get_data_dir(), "argo"))
+
+
 def get_plot_dir() -> str:
 	"""./plots"""
 	return guarantee_existence(os.path.join(get_nereus_dir(), "plots"))
