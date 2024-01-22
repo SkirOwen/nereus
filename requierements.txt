@@ -1,6 +1,8 @@
+aiohttp
 cartopy
 cmocean
 dask
+h5netcdf
 ipython
 matplotlib
 numpy

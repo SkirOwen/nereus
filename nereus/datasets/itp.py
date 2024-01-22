@@ -9,6 +9,11 @@ import shutil
 import ssl
 import urllib.request
 
+import aiohttp
+import asyncio
+
+from urllib.parse import urljoin
+
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
 
@@ -29,7 +34,71 @@ URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
 
-def get_filenames_from_url(url: str) -> list[str]:
+async def async_get_filenames_from_url(url: str) -> list[str]:
+	"""
+	Asynchronously gets the filename list for files ending with 'final.zip' from an archive-like URL.
+
+	Parameters
+	----------
+	url : str
+		The URL from which to scrape the filenames.
+
+	Returns
+	-------
+	list[str]
+		A list of filenames ending with 'final.zip'. If no such filenames are found,
+		an empty list is returned. If an error occurs, an empty list is returned and the error
+		is logged.
+	"""
+	async with aiohttp.ClientSession() as session:
+		try:
+			async with session.get(url, headers={
+				'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'}) as response:
+				html_content = await response.text()
+
+			lines = html_content.split("\n")
+
+			file_urls = []
+			directories_names = []
+
+			for line in lines:
+				if "href=" in line:
+					start_idx = line.find('href="') + 6
+					end_idx = line.find('"', start_idx)
+					if start_idx != -1 and end_idx != -1:
+						file_name = line[start_idx:end_idx]
+
+						if not file_name.startswith("/") and file_name.endswith("/"):
+							directories_names.append(file_name)
+						elif file_name.endswith("final.zip"):
+							file_urls.append(urljoin(url, file_name))
+
+			# Async calls for directories
+			if directories_names:
+				pbar = tqdm(total=len(directories_names), desc="Finding ITPs")
+				tasks = []
+				for directory in directories_names:
+					task = asyncio.create_task(async_get_filenames_from_url(urljoin(url, directory)))
+					task.add_done_callback(lambda p: pbar.update())
+					tasks.append(task)
+
+				directory_files = await asyncio.gather(*tasks)
+				pbar.close()
+
+				for files in directory_files:
+					file_urls.extend(files)
+
+			return file_urls
+
+		except Exception as e:
+			logger.error(
+				f"Error accessing {url}: {e}\n"
+				f"Try with '_get_filenames_from_url'"
+			)
+			return []
+
+
+def _get_filenames_from_url(url: str) -> list[str]:
 	"""
 	Gets the filename list for files ending with 'final.tar.Z' from an archive-like URL.
 
@@ -57,16 +126,26 @@ def get_filenames_from_url(url: str) -> list[str]:
 
 	lines = html_content.split("\n")
 
-	file_names = []
+	file_urls = []
+	directories_names = []
 	for line in lines:
-		if "final.zip" in line:
+		if "href=" in line:
 			start_idx = line.find('href="') + 6  # Find the start index of the filename
 			end_idx = line.find('"', start_idx)  # Find the end index of the filename
 			if start_idx != -1 and end_idx != -1:  # Check that both indices were found
 				file_name = line[start_idx:end_idx]
-				file_names.append(file_name)
 
-	return file_names
+				if not (file_name.startswith("/")) and file_name.endswith("/"):
+					directories_names.append(file_name)
+
+				if file_name.endswith("final.zip"):
+					file_urls.append(urljoin(url, file_name))
+
+	for directory in tqdm(directories_names):
+		directory_url = urljoin(url, directory)
+		file_urls.extend(_get_filenames_from_url(directory_url))
+
+	return file_urls
 
 
 def get_md5sum_dict() -> dict[str, str]:
@@ -83,7 +162,7 @@ def get_md5sum_dict() -> dict[str, str]:
 		downloader([MD5_URL], get_itp_dir())
 
 	hash = calculate_md5(md5sum_filepath)
-	if not(hash == "67ecdfe4bac8a5fd277bdf67cb59d7b6"):
+	if not (hash == "67ecdfe4bac8a5fd277bdf67cb59d7b6"):
 		logger.info("The md5 of the md5 file did not match.")
 
 	with open(md5sum_filepath, "r") as f:
@@ -96,27 +175,26 @@ def get_md5sum_dict() -> dict[str, str]:
 	return md5_dict
 
 
-def download_itp(main_url: str, files: None | list[str] = None, override: bool = False) -> None:
+def download_itp(files_urls: None | list[str] = None, override: bool = False) -> None:
 	"""
-	Downloads files with the extension 'final.tar.Z' from the specified main URL.
+	Downloads files with the extension 'final.zip' from the specified main URL.
 
 	Parameters
 	----------
 	main_url : str
 		The main URL where the files are hosted.
-	files : None | list[str], optional
+	files_urls : None | list[str], optional
 		A list of filenames to download. If `None`, the function will scrape the filenames
 		using `get_filenames_from_url` function. Default is `None`.
 	override : bool, optional
 		Whether to override existing files with the same name. Default is `False`.
 	"""
-	if files is None:
-		files = get_filenames_from_url(main_url)
+	if files_urls is None:
+		files_urls = asyncio.run(async_get_filenames_from_url(URL))
 
 	itp_dir = get_itp_dir()
 
-	urls = [main_url + f for f in files]
-	downloader(urls, itp_dir, override=override)
+	downloader(files_urls, itp_dir, override=override)
 
 
 def _extract_itp(file: str, target_directory: None | str = None) -> None:
@@ -199,8 +277,8 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	metadata.update(zip(attribute_names, metadata_values))
 
 	metadata["time"] = (
-		datetime.datetime(year=metadata["year"], month=1, day=1) +
-		datetime.timedelta(days=metadata["day"] - 1)    # -1 because Jan 1st is day 1.0000
+			datetime.datetime(year=metadata["year"], month=1, day=1) +
+			datetime.timedelta(days=metadata["day"] - 1)  # -1 because Jan 1st is day 1.0000
 	)
 
 	# The name of the variables are stored on line 2
@@ -238,13 +316,6 @@ def parser_all_itp(limit: int = None) -> tuple:
 
 	metadatas = []
 	itps = []
-	# with ThreadPoolExecutor() as pool:
-	# 	with tqdm(total=len(files)) as progress_bar:
-	# 		futures = {pool.submit(itp_parser, file, progress_bar): file for file in files}
-	# 		for future in concurrent.futures.as_completed(futures):
-	# 			data, metadata = future.result()
-	# 			itps.append(data)
-	# 			metadatas.append(metadata)
 
 	with Pool() as pool:
 		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
@@ -302,7 +373,12 @@ def query_from_metadata(query: str) -> list:
 
 
 def main():
-	itps_to_df()
+	urls = asyncio.run(async_get_filenames_from_url(URL))
+	# print(urls)
+	print(len(urls))
+
+
+# itps_to_df()
 
 
 if __name__ == "__main__":
