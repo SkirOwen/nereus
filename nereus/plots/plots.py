@@ -27,7 +27,7 @@ def get_arctic_map():
 	center, radius = [0.5, 0.5], 0.5
 	verts = np.vstack([np.sin(theta), np.cos(theta)]).T
 	circle = mpath.Path(verts * radius + center)
-	ax.stock_img()
+	ax.coastlines()
 	ax.set_boundary(circle, transform=ax.transAxes)
 	return fig, ax
 
@@ -72,8 +72,7 @@ def map_udash(udash):
 
 def udash_depth_hist(udash):
 	logger.info("Plotting depth histogram")
-	print(udash.columns)
-	sns.displot(udash, x="Temp[C]")
+	sns.displot(udash, x="Depth_[m]")
 	plt.savefig(os.path.join(get_plot_dir(), "udash_depth_hist.png"), dpi=1000)
 	plt.show()
 
@@ -111,11 +110,13 @@ def time_hist(metadatas) -> None:
 
 
 def main():
-	udash = load_udash()
+	# udash = load_udash()
 	# map_udash(udash)
-	udash_depth_hist(udash)
+	# udash_depth_hist(udash)
 	# udash_months_hist(udash)
 	# udash_time_hist(udash)
+	fig, ax = get_arctic_map()
+	plt.show()
 
 
 if __name__ == "__main__":
