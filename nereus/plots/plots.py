@@ -32,12 +32,31 @@ def get_arctic_map():
 	return fig, ax
 
 
-def map_itps(itps_lat_lon: list):
-	lat, lon = itps_lat_lon
+def map_itps(itps_metadata):
+	dt_itps = itps_metadata.drop_duplicates(["longitude(E+)", "latitude(N+)", "time"]).sort_index()
 
 	fig, ax = get_arctic_map()
 
-	ax.scatter(lon, lat, transform=ccrs.PlateCarree())
+	logger.info("Scatter plot, takes some time")
+	with Console().status("Loading") as st:
+		g = sns.scatterplot(
+			data=dt_itps,
+			x="longitude(E+)",
+			y="latitude(N+)",
+			hue="time",
+			size=1,
+			ax=ax,
+			transform=ccrs.PlateCarree(),
+			markers="h",
+		)
+
+	logger.info("Removing legend")
+	g.legend_.remove()
+	plt.legend([], [], frameon=False)
+
+	logger.info("Saving to file")
+	plt.savefig(os.path.join(get_plot_dir(), "itps_map.png"))
+
 	plt.show()
 
 
@@ -115,8 +134,11 @@ def main():
 	# udash_depth_hist(udash)
 	# udash_months_hist(udash)
 	# udash_time_hist(udash)
-	fig, ax = get_arctic_map()
-	plt.show()
+	# fig, ax = get_arctic_map()
+	# plt.show()
+	itps, metadata = load_itp()
+	map_itps(metadata)
+	# time_hist(metadata)
 
 
 if __name__ == "__main__":
