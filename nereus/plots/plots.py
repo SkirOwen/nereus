@@ -44,7 +44,7 @@ def map_itps(itps_metadata):
 			x="longitude(E+)",
 			y="latitude(N+)",
 			hue="time",
-			size=1,
+			s=1,
 			ax=ax,
 			transform=ccrs.PlateCarree(),
 			markers="h",
@@ -74,7 +74,7 @@ def map_udash(udash):
 			x="Longitude_[deg]",
 			y="Latitude_[deg]",
 			hue="yyyy-mm-ddThh:mm",
-			size=2,
+			s=1,
 			ax=ax,
 			transform=ccrs.PlateCarree(),
 			markers="h",
@@ -129,8 +129,8 @@ def time_hist(metadatas) -> None:
 
 
 def main():
-	# udash = load_udash()
-	# map_udash(udash)
+	udash = load_udash()
+	map_udash(udash)
 	# udash_depth_hist(udash)
 	# udash_months_hist(udash)
 	# udash_time_hist(udash)
