@@ -4,6 +4,10 @@ import glob
 import os
 import shutil
 
+import xarray as xr
+
+from tqdm import tqdm
+
 from nereus import logger
 from nereus.utils.downloader import downloader
 from nereus.utils.directories import get_argo_dir
@@ -27,6 +31,17 @@ def extract_argo():
 		extract_dir=argo_dir,
 		format="gztar"
 	)
+
+def load_all_argo():
+	all_argo = [
+		f for f in os.listdir(get_argo_dir())
+		if f.endswith(".nc")
+	]
+
+	dss = []
+	for f in tqdm(all_argo):
+		dss.append(xr.open_dataset(os.path.join(get_argo_dir(), f)))
+	return dss
 
 
 def main():
