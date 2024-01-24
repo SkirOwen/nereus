@@ -27,10 +27,11 @@ def extract_argo():
 	print(filename)
 
 	shutil.unpack_archive(
-		filename=os.path.join(argo_dir, "filename"),
+		filename=os.path.join(argo_dir, filename[0]),
 		extract_dir=argo_dir,
 		format="gztar"
 	)
+
 
 def load_all_argo():
 	all_argo = [
