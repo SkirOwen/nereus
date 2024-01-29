@@ -6,14 +6,58 @@ import urllib.error
 
 from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPResponse
+
+from rich.console import RenderableType
 from tqdm.auto import tqdm
 
-from typing import Generator, Sequence
+from typing import Generator, Sequence, Iterable
+
+from rich.panel import Panel
+from rich.progress import (
+	BarColumn,
+	DownloadColumn,
+	Progress,
+	TaskID,
+	TextColumn,
+	TimeElapsedColumn,
+	TimeRemainingColumn,
+	TransferSpeedColumn,
+	MofNCompleteColumn
+)
 
 from nereus import logger
 
+import signal
+from threading import Event
+
+done_event = Event()
+
+
+def handle_sigint(signum, frame):
+	done_event.set()
+
+
+signal.signal(signal.SIGINT, handle_sigint)
+
 CHUNK_SIZE = 1024
 
+
+progress = Progress(
+	TextColumn("[bold blue]{task.fields[filename]}", justify="right"),
+	"[progress.percentage]{task.percentage:>3.1f}%",
+	BarColumn(bar_width=None),
+	"|",
+	DownloadColumn(),
+	"[",
+	TimeElapsedColumn(),
+	"<",
+	TimeRemainingColumn(),
+	", ",
+	TransferSpeedColumn(),
+	"]"
+)
+# 	bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
+	# 	           " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
 
 def _get_response_size(resp: HTTPResponse) -> None | int:
 	"""
@@ -63,7 +107,7 @@ def _get_response(url: str) -> HTTPResponse:
 	return response
 
 
-def _url_download(url: str, path: str, task: int = 1, total: int = 1) -> None:
+def _url_download(url: str, path: str, task, total: int = 1) -> None:
 	"""
 	Download an url to a local file
 
@@ -71,26 +115,31 @@ def _url_download(url: str, path: str, task: int = 1, total: int = 1) -> None:
 	--------
 	downloader : Downloads multiple url in parallel.
 	"""
-	logger.info(f"Downloading: '{url}' to {path}")
+	logger.info(f"Downloading: '{url}'")
 	response = _get_response(url)
 	chunks = _get_chunks(response)
-	pbar = tqdm(
-		desc=f"[{task}/{total}] Requesting {os.path.basename(url)}",
-		unit="B",
-		total=_get_response_size(response),
-		unit_scale=True,
-		# format to have current/total size with the full unit, e.g. 60kB/6MB
-		# https://github.com/tqdm/tqdm/issues/952
-		bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
-		           " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
-	)
-	with pbar as t:
-		with open(path, "wb") as file:
-			for chunk in chunks:
-				file.write(chunk)
-				t.update(len(chunk))
-			# if done_event.is_set():
-			# 	return
+	# pbar = tqdm(
+	# 	desc=f"[{task}/{total}] Requesting {os.path.basename(url)}",
+	# 	unit="B",
+	# 	total=_get_response_size(response),
+	# 	unit_scale=True,
+	# 	# format to have current/total size with the full unit, e.g. 60kB/6MB
+	# 	# https://github.com/tqdm/tqdm/issues/952
+	# 	bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
+	# 	           " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+	# )
+	# with pbar as t:
+	progress.update(task_id=task, total=_get_response_size(response))
+
+	with open(path, "wb") as file:
+		progress.start_task(task)
+		for chunk in chunks:
+			file.write(chunk)
+			# t.update(len(chunk))
+			progress.update(task_id=task, advance=len(chunk))
+			if done_event.is_set():
+				return
+	progress.remove_task(task)
 	logger.debug(f"Downloaded in {path}")
 
 
@@ -101,18 +150,20 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 	if isinstance(urls, str):
 		urls = [urls]
 
-	with ThreadPoolExecutor(max_workers=4) as pool:
-		root = os.path.abspath(root)
-		for task, url in enumerate(urls, start=1):
-			filename = url.split("/")[-1]
-			filename = filename.split("?")[0]   # Removing HTML tag/option
-			target_path = os.path.join(root, filename)
+	with progress:
+		with ThreadPoolExecutor(max_workers=4) as pool:
+			root = os.path.abspath(root)
+			for url in urls:
+				filename = url.split("/")[-1]
+				filename = filename.split("?")[0]   # Removing HTML tag/option
+				target_path = os.path.join(root, filename)
+				task = progress.add_task("Download", filename=filename, start=False, total=len(urls))
 
-			if not os.path.exists(target_path) or override:
-				# TODO: when file present it should only skip if checksum matches, if checksum_check is done
-				pool.submit(_url_download, url, target_path, task, total=len(urls))
-			else:
-				logger.info(f"Skipping {filename} as already present in {root}")
+				if not os.path.exists(target_path) or override:
+					# TODO: when file present it should only skip if checksum matches, if checksum_check is done
+					pool.submit(_url_download, url, target_path, task, total=len(urls))
+				else:
+					logger.info(f"Skipping {filename} as already present in {root}")
 
 
 # future update:
