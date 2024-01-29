@@ -3,15 +3,10 @@ from __future__ import annotations
 import os.path
 import urllib.request
 import urllib.error
+import signal
 
 from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPResponse
-
-from rich.console import RenderableType
-from tqdm.auto import tqdm
-
-from typing import Generator, Sequence, Iterable
-
 from rich.panel import Panel
 from rich.progress import (
 	BarColumn,
@@ -22,13 +17,13 @@ from rich.progress import (
 	TimeElapsedColumn,
 	TimeRemainingColumn,
 	TransferSpeedColumn,
-	MofNCompleteColumn
 )
+from threading import Event
+
+from typing import Generator, Sequence
 
 from nereus import logger
 
-import signal
-from threading import Event
 
 done_event = Event()
 
@@ -38,7 +33,6 @@ def handle_sigint(signum, frame):
 
 
 signal.signal(signal.SIGINT, handle_sigint)
-
 CHUNK_SIZE = 1024
 
 
@@ -56,8 +50,9 @@ progress = Progress(
 	TransferSpeedColumn(),
 	"]"
 )
-# 	bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
-	# 	           " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+	# bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
+	# " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+
 
 def _get_response_size(resp: HTTPResponse) -> None | int:
 	"""
@@ -107,7 +102,7 @@ def _get_response(url: str) -> HTTPResponse:
 	return response
 
 
-def _url_download(url: str, path: str, task, total: int = 1) -> None:
+def _url_download(url: str, path: str, task: TaskID, total: int = 1) -> None:
 	"""
 	Download an url to a local file
 
