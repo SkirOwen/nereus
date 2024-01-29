@@ -316,6 +316,93 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	return data, metadata
 
 
+def itp_parser_xr(filepath: str, progress_bar=None) -> tuple[dict, dict]:
+	"""
+	Parse data from an ITP file.
+
+	This function reads data from the specified ITP file and extracts both metadata
+	and data values.
+
+	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
+	and data starting from the fourth line until the end.
+
+	Parameters
+	----------
+	filepath : str
+		The path to the ITP file to be parsed.
+
+	Returns
+	-------
+	tuple of dict and dict
+		A tuple containing two dictionaries:
+			- The first dictionary contains the parsed data values, where keys are variable names
+			and values are lists of corresponding data points.
+			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
+	"""
+	attributes = {
+		"source": "ITP",
+	}
+
+	with open(filepath, "r") as f:
+		lines = f.readlines()
+
+	# the header of the metadata is in two parts separated by a colon
+	# the left part follows this:
+	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
+	# the right part this one:
+	# NAME NAME NAME NAME
+	instrument_info, attributes_names = lines[0].split(":")
+
+	# Line 0 and 1 stores the metadata
+	# Using re to remove the "%", ":", "," character form the string
+	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
+
+	attributes.update(skipwise(instrument_info, step=2))
+
+	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
+	attributes_values = lines[1].split()
+	# casting the float values of the metadata to floats as they are stored in str
+
+	attributes.update(zip(attributes_names, attributes_values))
+
+	attributes["time"] = (
+			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
+			datetime.timedelta(days=float(attributes["day"]) - 1)  # -1 because Jan 1st is day 1.0000
+	)
+
+	# data_names = lines[2][1:].split()
+	# data_values = [np.fromstring(line, sep="\t") for line in lines[3:-1]]
+	# df = pd.DataFrame(data_values, columns=data_names)
+	# # Convert DataFrame to xarray Dataset
+	# ds = xr.Dataset.from_dataframe(df)
+	# # Add metadata as attributes
+	# for key, value in metadata.items():
+	# 	ds.attrs[key] = value
+
+
+	# The name of the variables are stored on line 2
+	data_names = lines[2][1:].split()
+	data = {name: [] for name in data_names}
+
+	# The data start at line 3
+	# Line -1 is an eof tag, so ignoring it
+	for line in lines[3:-1]:
+		# values = list(map(ast.literal_eval, line.split()))
+		values = np.fromstring(line, sep="\t")
+		for name, val in zip(data_names, values):
+			data[name].append(val)
+
+	data["file"] = os.path.basename(filepath)
+	if "nobs" in data_names:
+		data["nobs"] = list(map(int, data["nobs"]))
+
+	if progress_bar is not None:
+		progress_bar.update(1)
+
+	return data, attributes
+
+
+
 def parser_all_itp(limit: int = None) -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
@@ -386,9 +473,7 @@ def query_from_metadata(query: str) -> list:
 
 
 def main():
-	urls = asyncio.run(async_get_filenames_from_url(URL))
-	# print(urls)
-	print(len(urls))
+	download_itp(override=True)
 
 
 # itps_to_df()
