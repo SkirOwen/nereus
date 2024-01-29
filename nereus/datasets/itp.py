@@ -33,6 +33,19 @@ from nereus.utils.iterable_ops import skipwise
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
+col_itp = [
+	'pressure(dbar)', 'temperature(C)', 'salinity', 'nobs', 'file',
+	'east(cm/s)', 'north(cm/s)', 'vert(cm/s)', 'nacm', 'dissolved_oxygen',
+	'CDOM(ppb)', 'PAR(uE/m^2/s)', 'turbidity(/m/sr)x10^4',
+	'chlorophyll-a(ug/l)', 'dissolved_oxygen(umol/kg)', 'turbidity(e-4)',
+	'chlorophyll_a(ug/l)', 'nbio'
+]
+
+col_meta = [
+	'file', 'source', 'ITP', 'profile', 'year', 'day', 'longitude(E+)',
+	'latitude(N+)', 'ndepths', 'time'
+]
+
 
 async def async_get_filenames_from_url(url: str) -> list[str]:
 	"""
