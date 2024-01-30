@@ -145,6 +145,8 @@ cython_debug/
 out
 gen
 
+# MacOS bloat
+.DS_Store
 
 # Local project files
 data/
