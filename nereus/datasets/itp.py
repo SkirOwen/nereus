@@ -20,6 +20,7 @@ from multiprocessing import Pool
 import numpy as np
 import polars as pl
 import pandas as pd
+import xarray as xr
 
 from tqdm import tqdm
 
@@ -27,7 +28,7 @@ from nereus import logger
 
 from nereus.utils.downloader import downloader
 from nereus.utils.file_ops import calculate_md5
-from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir
+from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir, get_itp_cache_dir
 from nereus.utils.iterable_ops import skipwise
 
 URL = "https://scienceweb.whoi.edu/itp/data/"
@@ -316,7 +317,7 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	return data, metadata
 
 
-def itp_parser_xr(filepath: str, progress_bar=None) -> tuple[dict, dict]:
+def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
 	"""
 	Parse data from an ITP file.
 
@@ -360,6 +361,11 @@ def itp_parser_xr(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	attributes.update(skipwise(instrument_info, step=2))
 
 	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
+
+	# Cleaning the name of the attributes
+	replacements = {"longitude(E+)": "longitude", "latitude(N+)": "latitude"}
+	attributes_names = [replacements.get(item, item) for item in attributes_names]
+
 	attributes_values = lines[1].split()
 	# casting the float values of the metadata to floats as they are stored in str
 
@@ -369,38 +375,50 @@ def itp_parser_xr(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
 			datetime.timedelta(days=float(attributes["day"]) - 1)  # -1 because Jan 1st is day 1.0000
 	)
-
-	# data_names = lines[2][1:].split()
-	# data_values = [np.fromstring(line, sep="\t") for line in lines[3:-1]]
-	# df = pd.DataFrame(data_values, columns=data_names)
-	# # Convert DataFrame to xarray Dataset
-	# ds = xr.Dataset.from_dataframe(df)
-	# # Add metadata as attributes
-	# for key, value in metadata.items():
-	# 	ds.attrs[key] = value
-
-
 	# The name of the variables are stored on line 2
-	data_names = lines[2][1:].split()
-	data = {name: [] for name in data_names}
+	coords = {
+		'longitude': float(attributes["longitude"]),
+		'latitude': float(attributes["latitude"]),
+		'time': attributes["time"],
+		# "ndepth": int(attributes["ndepths"])
+	}
+	attributes.pop("time")
 
-	# The data start at line 3
-	# Line -1 is an eof tag, so ignoring it
+	data_names = lines[2][1:].split()
+	data = {name: (["ndepths"], []) for name in data_names}
 	for line in lines[3:-1]:
 		# values = list(map(ast.literal_eval, line.split()))
 		values = np.fromstring(line, sep="\t")
 		for name, val in zip(data_names, values):
-			data[name].append(val)
+			if name == "nobs":
+				val = int(val)
+			data[name][1].append(val)
 
-	data["file"] = os.path.basename(filepath)
-	if "nobs" in data_names:
-		data["nobs"] = list(map(int, data["nobs"]))
+	ds = xr.Dataset(data_vars=data, coords=coords, attrs=attributes)
+	ds.to_netcdf(os.path.join(get_itp_cache_dir(), f"{os.path.basename(filepath)}.nc"))
+	return ds
 
-	if progress_bar is not None:
-		progress_bar.update(1)
 
-	return data, attributes
+def parser_all_itp_xr(limit: int = None) -> None:
+	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
+	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
+	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
+	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
+	logger.info(f"Found {len(files)} ITPs to parse")
 
+	if limit is not None and limit <= len(files):
+		logger.info(f"Only parsing {limit} files")
+		files = files[:limit]
+
+	with Pool() as pool:
+		for _ in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
+			pass
+
+
+def load_all_itp_xr() -> xr.Dataset:
+	cache_dir = get_itp_cache_dir()
+	itp = xr.open_mfdataset(cache_dir)
+	return itp
 
 
 def parser_all_itp(limit: int = None) -> tuple:
@@ -473,7 +491,8 @@ def query_from_metadata(query: str) -> list:
 
 
 def main():
-	download_itp(override=True)
+	# download_itp(override=True)
+	parser_all_itp_xr()
 
 
 # itps_to_df()

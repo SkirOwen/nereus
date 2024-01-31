@@ -14,6 +14,11 @@ def get_itp_dir() -> str:
 	return guarantee_existence(os.path.join(get_data_dir(), "itp"))
 
 
+def get_itp_cache_dir() -> str:
+	"""./data/itp/cache"""
+	return guarantee_existence(os.path.join(get_itp_dir(), "cache"))
+
+
 def get_itp_extracted_dir() -> str:
 	"""./data/itp/extracted"""
 	return guarantee_existence(os.path.join(get_itp_dir(), "extracted"))
