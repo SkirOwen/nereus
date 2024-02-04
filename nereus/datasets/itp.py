@@ -371,18 +371,15 @@ def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
 
 	attributes.update(zip(attributes_names, attributes_values))
 
-	attributes["time"] = (
-			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
-			datetime.timedelta(days=float(attributes["day"]) - 1)  # -1 because Jan 1st is day 1.0000
-	)
 	# The name of the variables are stored on line 2
 	coords = {
 		'longitude': float(attributes["longitude"]),
 		'latitude': float(attributes["latitude"]),
-		'time': attributes["time"],
+		'time':
+			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
+			datetime.timedelta(days=float(attributes["day"]) - 1), # -1 because Jan 1st is day 1.0000
 		# "ndepth": int(attributes["ndepths"])
 	}
-	attributes.pop("time")
 
 	data_names = lines[2][1:].split()
 	data = {name: (["ndepths"], []) for name in data_names}
@@ -410,14 +407,30 @@ def parser_all_itp_xr(limit: int = None) -> None:
 		logger.info(f"Only parsing {limit} files")
 		files = files[:limit]
 
+	itp_sizes = []
+
 	with Pool() as pool:
-		for _ in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
-			pass
+		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
+			itp_sizes.append(itp.sizes["ndepths"])
+
+	return max(itp_sizes)
 
 
 def load_all_itp_xr() -> xr.Dataset:
 	cache_dir = get_itp_cache_dir()
-	itp = xr.open_mfdataset(cache_dir)
+	files = glob.glob(os.path.join(cache_dir, "*.nc"))
+
+	def preprocess(ds):
+		padding = max_length - ds.sizes["ndepths"]
+		ds = ds.pad({"ndepths": (0, padding)})
+		return ds
+
+	max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
+	itp = xr.open_mfdataset(files, parallel=True, preprocess=preprocess, combine="nested", concat_dim="time")
+	itp["nobs"] = itp["nobs"].astype(np.int32)
+
+	itp.to_netcdf(os.path.join(get_itp_cache_dir(), f"all_itp_{len(files)}.nc"))
+
 	return itp
 
 
@@ -492,7 +505,8 @@ def query_from_metadata(query: str) -> list:
 
 def main():
 	# download_itp(override=True)
-	parser_all_itp_xr()
+	# parser_all_itp_xr(1)
+	load_all_itp_xr()
 
 
 # itps_to_df()
