@@ -413,6 +413,9 @@ def parser_all_itp_xr(limit: int = None) -> None:
 		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
 			itp_sizes.append(itp.sizes["ndepths"])
 
+	with open(os.path.join(get_itp_cache_dir(), "cache_size"), "w") as f:
+		f.write(str(max(itp_sizes)))
+
 	return max(itp_sizes)
 
 
@@ -420,15 +423,33 @@ def load_all_itp_xr() -> xr.Dataset:
 	cache_dir = get_itp_cache_dir()
 	files = glob.glob(os.path.join(cache_dir, "*.nc"))
 
-	def preprocess(ds):
-		padding = max_length - ds.sizes["ndepths"]
-		ds = ds.pad({"ndepths": (0, padding)})
-		return ds
+	if os.path.exists(os.path.join(cache_dir, "cache_size")):
+		with open(os.path.join(get_itp_cache_dir(), "cache_size"), "r") as f:
+			max_length = int(f.readlines()[0])
+	else:
+		max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
 
-	max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
-	itp = xr.open_mfdataset(files, parallel=True, preprocess=preprocess, combine="nested", concat_dim="time")
+	pbar = tqdm(desc="file", total=len(files), bar_format='{l_bar}{bar}{r_bar}')
+
+	with pbar as t:
+		def preprocess(ds):
+			padding = max_length - ds.sizes["ndepths"]
+			ds = ds.pad({"ndepths": (0, padding)})
+			t.update(1)
+			return ds
+
+		itp = xr.open_mfdataset(
+			files,
+			parallel=True,
+			preprocess=preprocess,
+			combine="nested",
+			concat_dim="time",
+			chunks={},
+		)
+	logger.info("Opening done")
 	itp["nobs"] = itp["nobs"].astype(np.int32)
 
+	logger.info("Saving to file")
 	itp.to_netcdf(os.path.join(get_itp_cache_dir(), f"all_itp_{len(files)}.nc"))
 
 	return itp
@@ -505,7 +526,7 @@ def query_from_metadata(query: str) -> list:
 
 def main():
 	# download_itp(override=True)
-	# parser_all_itp_xr(1)
+	# parser_all_itp_xr()
 	load_all_itp_xr()
 
 
