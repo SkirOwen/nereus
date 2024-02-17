@@ -7,8 +7,10 @@ import shutil
 from datetime import datetime, date
 from multiprocessing import Pool
 
+import numpy as np
 import pandas as pd
 import polars as pl
+import xarray as xr
 from tqdm import tqdm
 from rich.progress import track
 
@@ -89,7 +91,7 @@ def _udash_fileparser(filepath: str):
 	return data
 
 
-def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
+def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
 	udash_extracted_dir = get_udash_extracted_dir()
 	if files is None:
 		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
@@ -112,7 +114,10 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None):
 	df = pl.concat(udash, how="diagonal")
 	df = convert_type(df)
 
-	df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
+	if cache == "parqet":
+		df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
+	if cache == "xarray":
+		df = udash_xr(df, save=True)
 	return df
 
 
@@ -128,20 +133,62 @@ def convert_type(df: pl.DataFrame):
 	return df
 
 
-def load_udash(regenerate: bool = False):
-	udash_filepath = os.path.join(get_udash_dir(), "udash.parquet")
+def udash_xr(df: pd.DataFrame, save: bool = True) -> xr.Dataset:
+	logger.info("Converting to xarray")
+	ds = xr.Dataset.from_dataframe(df)
+	ds = ds.rename({
+		"yyyy-mm-ddThh:mm": "time",
+		"Longitude_[deg]": "lon",
+		"Latitude_[deg]": "lat",
+	})
+	ds = ds.set_coords("time")
+	ds = ds.swap_dims({"index": "time"})
+	ds = ds.drop_vars("index")
+	ds = ds.set_coords(["lon", "lat"])
+	logger.info("Converted!")
+	if save:
+		logger.info("Caching")
+		ds.to_netcdf(os.path.join(get_udash_dir(), "udash.nc"))
+	return ds
+
+
+def load_udash(
+		cache: str = "xarray",
+		drop_argo: bool = False,
+		drop_itp: bool = False,
+		regenerate: bool = False,
+		file: str | None = "udash_no_itp_argo.nc",
+	) -> pd.DataFrame | xr.Dataset:
+
+	file_ext = "nc" if cache == "xarray" else "parquet"
+	file = f"udash.{file_ext}" if file is None else file
+
+	udash_filepath = os.path.join(get_udash_dir(), file)
+	udash_parquet_filepath = os.path.join(get_udash_dir(), "udash.parquet")
+	xr_flag = False
 
 	if regenerate or not os.path.exists(udash_filepath):
-		parse_udash()
+		if os.path.exists(udash_parquet_filepath):
+			udash = udash_xr(pd.read_parquet(udash_parquet_filepath))
+			xr_flag = True
+		else:
+			parse_udash(cache=cache)
 
-	df = pd.read_parquet(udash_filepath)
-	return df
+	if cache == "xarray" and not xr_flag:
+		udash = xr.open_dataset(udash_filepath)
+		if drop_itp:
+			udash = udash.where(np.logical_not(udash.Cruise.str.contains("itp")))
+		if drop_argo:
+			udash = udash.where(udash.Source != "argo", drop=True)
+	if cache == "parquet":
+		udash = pd.read_parquet(udash_filepath)
+	return udash
 
 
 def main():
 	# download_udash(URL)
 	# _extract_udash()
-	parse_udash()
+	load_udash()
 
 
 if __name__ == "__main__":

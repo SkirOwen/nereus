@@ -12,6 +12,8 @@ import urllib.request
 import aiohttp
 import asyncio
 
+from functools import partial
+
 from urllib.parse import urljoin
 
 from concurrent.futures import ThreadPoolExecutor
@@ -46,6 +48,27 @@ col_meta = [
 	'file', 'source', 'ITP', 'profile', 'year', 'day', 'longitude(E+)',
 	'latitude(N+)', 'ndepths', 'time'
 ]
+
+
+rename_col = {
+	'pressure(dbar)': "pressure",
+	'temperature(C)': "temp",
+	'salinity': "sal",
+	'east(cm/s)': "east",
+	'north(cm/s)': "north",
+	'vert(cm/s)': "vert",
+	'CDOM(ppb)': "CDOM",
+	# 'PAR(uE/m^2/s)':,
+	# 'turbidity(/m/sr)x10^4',
+	# 'chlorophyll-a(ug/l)',
+	# 'dissolved_oxygen(umol/kg)',
+	# 'turbidity(e-4)',
+	# 'chlorophyll_a(ug/l)',
+	'longitude(E+)': "longitude",
+	'latitude(N+)': "latitude",
+	# 'ndepths',
+	# 'time'
+}
 
 
 async def async_get_filenames_from_url(url: str) -> list[str]:
@@ -280,11 +303,11 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	# Line 0 and 1 stores the metadata
 	# Using re to remove the "%", ":", "," character form the string
-	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
+	instrument_info = re.sub(r"[%,]", "", instrument_info).lower().split()
 
 	metadata.update(skipwise(instrument_info, step=2))
 
-	attribute_names = re.sub(r"[%,]", "", attribute_names).split()
+	attribute_names = re.sub(r"[%,]", "", attribute_names).lower().split()
 	metadata_values = list(map(ast.literal_eval, lines[1].split()))
 	# casting the float values of the metadata to floats as they are stored in str
 
@@ -297,7 +320,7 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	# The name of the variables are stored on line 2
 	data_names = lines[2][1:].split()
-	data = {name: [] for name in data_names}
+	data = {name.lower(): [] for name in data_names}
 
 	# The data start at line 3
 	# Line -1 is an eof tag, so ignoring it
@@ -396,63 +419,63 @@ def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
 	return ds
 
 
-def parser_all_itp_xr(limit: int = None) -> None:
-	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
-	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
-	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
-	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
-	logger.info(f"Found {len(files)} ITPs to parse")
+# def parser_all_itp_xr(limit: int = None) -> None:
+# 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
+# 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
+# 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
+# 	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
+# 	logger.info(f"Found {len(files)} ITPs to parse")
+#
+# 	if limit is not None and limit <= len(files):
+# 		logger.info(f"Only parsing {limit} files")
+# 		files = files[:limit]
+#
+# 	itp_sizes = []
+#
+# 	with Pool() as pool:
+# 		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
+# 			itp_sizes.append(itp.sizes["ndepths"])
+#
+# 	with open(os.path.join(get_itp_cache_dir(), "cache_size"), "w") as f:
+# 		f.write(str(max(itp_sizes)))
+#
+# 	return max(itp_sizes)
 
-	if limit is not None and limit <= len(files):
-		logger.info(f"Only parsing {limit} files")
-		files = files[:limit]
 
-	itp_sizes = []
-
-	with Pool() as pool:
-		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
-			itp_sizes.append(itp.sizes["ndepths"])
-
-	with open(os.path.join(get_itp_cache_dir(), "cache_size"), "w") as f:
-		f.write(str(max(itp_sizes)))
-
-	return max(itp_sizes)
-
-
-def load_all_itp_xr() -> xr.Dataset:
-	cache_dir = get_itp_cache_dir()
-	files = glob.glob(os.path.join(cache_dir, "*.nc"))
-
-	if os.path.exists(os.path.join(cache_dir, "cache_size")):
-		with open(os.path.join(get_itp_cache_dir(), "cache_size"), "r") as f:
-			max_length = int(f.readlines()[0])
-	else:
-		max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
-
-	pbar = tqdm(desc="file", total=len(files), bar_format='{l_bar}{bar}{r_bar}')
-
-	with pbar as t:
-		def preprocess(ds):
-			padding = max_length - ds.sizes["ndepths"]
-			ds = ds.pad({"ndepths": (0, padding)})
-			t.update(1)
-			return ds
-
-		itp = xr.open_mfdataset(
-			files,
-			parallel=True,
-			preprocess=preprocess,
-			combine="nested",
-			concat_dim="time",
-			chunks={},
-		)
-	logger.info("Opening done")
-	itp["nobs"] = itp["nobs"].astype(np.int32)
-
-	logger.info("Saving to file")
-	itp.to_netcdf(os.path.join(get_itp_cache_dir(), f"all_itp_{len(files)}.nc"))
-
-	return itp
+# def load_all_itp_xr() -> xr.Dataset:
+# 	cache_dir = get_itp_cache_dir()
+# 	files = glob.glob(os.path.join(cache_dir, "*.nc"))
+#
+# 	if os.path.exists(os.path.join(cache_dir, "cache_size")):
+# 		with open(os.path.join(get_itp_cache_dir(), "cache_size"), "r") as f:
+# 			max_length = int(f.readlines()[0])
+# 	else:
+# 		max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
+#
+# 	pbar = tqdm(desc="file", total=len(files), bar_format='{l_bar}{bar}{r_bar}')
+#
+# 	with pbar as t:
+# 		def preprocess(ds):
+# 			padding = max_length - ds.sizes["ndepths"]
+# 			ds = ds.pad({"ndepths": (0, padding)})
+# 			t.update(1)
+# 			return ds
+#
+# 		itp = xr.open_mfdataset(
+# 			files,
+# 			parallel=True,
+# 			preprocess=preprocess,
+# 			combine="nested",
+# 			concat_dim="time",
+# 			chunks={},
+# 		)
+# 	logger.info("Opening done")
+# 	itp["nobs"] = itp["nobs"].astype(np.int32)
+#
+# 	logger.info("Saving to file")
+# 	itp.to_netcdf(os.path.join(get_itp_dir(), f"all_itp_{len(files)}.nc"))
+#
+# 	return itp
 
 
 def parser_all_itp(limit: int = None) -> tuple:
@@ -473,7 +496,6 @@ def parser_all_itp(limit: int = None) -> tuple:
 		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
 			itps.append(data)
 			metadatas.append(metadata)
-
 	return itps, metadatas
 
 
@@ -503,7 +525,7 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	return df_itps, df_metadatas
 
 
-def load_itp(regenerate: bool = False):
+def load_itp(regenerate: bool = False, join: bool = False):
 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
 
@@ -514,14 +536,54 @@ def load_itp(regenerate: bool = False):
 
 	df_itps = pd.read_parquet(itps_filepath)
 	df_metadatas = pd.read_csv(metadata_filepath)
-	return df_itps, df_metadatas
+	if join:
+		df_metadatas = df_metadatas.set_index("file")
+		return df_itps.join(df_metadatas, on="file")
+	else:
+		return df_itps, df_metadatas
 
 
-def query_from_metadata(query: str) -> list:
-	# load metadata file
-	# find file names to load
-	# delay load
-	pass
+def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', low: float = 10.0, high: float = 750.0, min_nobs: int = 2):
+	itps = load_itp(join=True) if itps is None else itps
+
+	itps = itps.rename(rename_col)
+
+	# Define a function to apply your conditions
+	def filter_groups(group, dim, low, high, min_nobs):
+		mask = (
+			group[dim].max() >= high and
+			group['pressure(dbar)'].min() <= low and
+			group["nobs"] > min_nobs
+		)
+		return mask
+
+	# Use the filter method to apply the conditions to each group
+	itp_range = itps.groupby('file').filter(
+		partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
+	)
+	itp_range.write_parquet(os.path.join(get_itp_dir(), "itps_range.parquet"))
+	return itp_range
+
+
+# itp_range should now contain only the groups that match your conditions
+def interp_itps(itps):
+
+
+
+def preload_itp(**kwargs) -> str:
+	# check download
+	# parse
+	# itp, metadata = parser_all_itp()
+
+	# concat
+	itps = load_itp(join=True)
+	# filter range
+	itps = select_range(itps)
+	# interpolate
+	itps_inter = interp_itps(itps)
+	# convert to xarray
+	# save
+	return ""
 
 
 def main():
