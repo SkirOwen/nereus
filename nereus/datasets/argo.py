@@ -4,6 +4,7 @@ import glob
 import os
 import shutil
 
+import pandas as pd
 import xarray as xr
 
 from tqdm import tqdm
@@ -43,6 +44,21 @@ def load_all_argo():
 	for f in tqdm(all_argo):
 		dss.append(xr.open_dataset(os.path.join(get_argo_dir(), f)))
 	return dss
+
+
+def argos_to_merge_df(dss):
+	all_argo = [
+		f for f in os.listdir(get_argo_dir())
+		if f.endswith(".nc")
+	]
+
+	dss = []
+	for f in tqdm(all_argo):
+		dss.append(xr.open_dataset(os.path.join(get_argo_dir(), f)).to_dataframe())
+
+	df = pd.merge(dss)
+
+	return df
 
 
 def preload(udash) -> str:

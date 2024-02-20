@@ -263,7 +263,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 		logger.info("All ITPs have been extracted.")
 
 
-def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
+def itp_parser(filepath: str, filtering: bool, nbr_filter: int = 2, low_filter: float = 10.0, high_filter: float = 750.0):
 	"""
 	Parse data from an ITP file.
 
@@ -277,6 +277,10 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	----------
 	filepath : str
 		The path to the ITP file to be parsed.
+	filtering
+	nbr_filter
+	low_filter
+	high_filter
 
 	Returns
 	-------
@@ -293,6 +297,16 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	with open(filepath, "r") as f:
 		lines = f.readlines()
+
+	if filtering:
+		if len(lines) <= nbr_filter + 5:
+			return
+
+		if float(lines[3].split()[0]) >= low_filter:
+			return
+
+		if float(lines[-2].split()[0]) <= high_filter:
+			return
 
 	# the header of the metadata is in two parts separated by a colon
 	# the left part follows this:
@@ -320,7 +334,8 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	# The name of the variables are stored on line 2
 	data_names = lines[2][1:].split()
-	data = {name.lower(): [] for name in data_names}
+	# name.lower().split("(")[0] would remove the unit and parenthesis
+	data = {name: [] for name in data_names}
 
 	# The data start at line 3
 	# Line -1 is an eof tag, so ignoring it
@@ -334,89 +349,86 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	if "nobs" in data_names:
 		data["nobs"] = list(map(int, data["nobs"]))
 
-	if progress_bar is not None:
-		progress_bar.update(1)
-
 	return data, metadata
 
-
-def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
-	"""
-	Parse data from an ITP file.
-
-	This function reads data from the specified ITP file and extracts both metadata
-	and data values.
-
-	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
-	and data starting from the fourth line until the end.
-
-	Parameters
-	----------
-	filepath : str
-		The path to the ITP file to be parsed.
-
-	Returns
-	-------
-	tuple of dict and dict
-		A tuple containing two dictionaries:
-			- The first dictionary contains the parsed data values, where keys are variable names
-			and values are lists of corresponding data points.
-			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
-	"""
-	attributes = {
-		"source": "ITP",
-	}
-
-	with open(filepath, "r") as f:
-		lines = f.readlines()
-
-	# the header of the metadata is in two parts separated by a colon
-	# the left part follows this:
-	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
-	# the right part this one:
-	# NAME NAME NAME NAME
-	instrument_info, attributes_names = lines[0].split(":")
-
-	# Line 0 and 1 stores the metadata
-	# Using re to remove the "%", ":", "," character form the string
-	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
-
-	attributes.update(skipwise(instrument_info, step=2))
-
-	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
-
-	# Cleaning the name of the attributes
-	replacements = {"longitude(E+)": "longitude", "latitude(N+)": "latitude"}
-	attributes_names = [replacements.get(item, item) for item in attributes_names]
-
-	attributes_values = lines[1].split()
-	# casting the float values of the metadata to floats as they are stored in str
-
-	attributes.update(zip(attributes_names, attributes_values))
-
-	# The name of the variables are stored on line 2
-	coords = {
-		'longitude': float(attributes["longitude"]),
-		'latitude': float(attributes["latitude"]),
-		'time':
-			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
-			datetime.timedelta(days=float(attributes["day"]) - 1), # -1 because Jan 1st is day 1.0000
-		# "ndepth": int(attributes["ndepths"])
-	}
-
-	data_names = lines[2][1:].split()
-	data = {name: (["ndepths"], []) for name in data_names}
-	for line in lines[3:-1]:
-		# values = list(map(ast.literal_eval, line.split()))
-		values = np.fromstring(line, sep="\t")
-		for name, val in zip(data_names, values):
-			if name == "nobs":
-				val = int(val)
-			data[name][1].append(val)
-
-	ds = xr.Dataset(data_vars=data, coords=coords, attrs=attributes)
-	ds.to_netcdf(os.path.join(get_itp_cache_dir(), f"{os.path.basename(filepath)}.nc"))
-	return ds
+#
+# def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
+# 	"""
+# 	Parse data from an ITP file.
+#
+# 	This function reads data from the specified ITP file and extracts both metadata
+# 	and data values.
+#
+# 	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
+# 	and data starting from the fourth line until the end.
+#
+# 	Parameters
+# 	----------
+# 	filepath : str
+# 		The path to the ITP file to be parsed.
+#
+# 	Returns
+# 	-------
+# 	tuple of dict and dict
+# 		A tuple containing two dictionaries:
+# 			- The first dictionary contains the parsed data values, where keys are variable names
+# 			and values are lists of corresponding data points.
+# 			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
+# 	"""
+# 	attributes = {
+# 		"source": "ITP",
+# 	}
+#
+# 	with open(filepath, "r") as f:
+# 		lines = f.readlines()
+#
+# 	# the header of the metadata is in two parts separated by a colon
+# 	# the left part follows this:
+# 	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
+# 	# the right part this one:
+# 	# NAME NAME NAME NAME
+# 	instrument_info, attributes_names = lines[0].split(":")
+#
+# 	# Line 0 and 1 stores the metadata
+# 	# Using re to remove the "%", ":", "," character form the string
+# 	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
+#
+# 	attributes.update(skipwise(instrument_info, step=2))
+#
+# 	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
+#
+# 	# Cleaning the name of the attributes
+# 	replacements = {"longitude(E+)": "longitude", "latitude(N+)": "latitude"}
+# 	attributes_names = [replacements.get(item, item) for item in attributes_names]
+#
+# 	attributes_values = lines[1].split()
+# 	# casting the float values of the metadata to floats as they are stored in str
+#
+# 	attributes.update(zip(attributes_names, attributes_values))
+#
+# 	# The name of the variables are stored on line 2
+# 	coords = {
+# 		'longitude': float(attributes["longitude"]),
+# 		'latitude': float(attributes["latitude"]),
+# 		'time':
+# 			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
+# 			datetime.timedelta(days=float(attributes["day"]) - 1), # -1 because Jan 1st is day 1.0000
+# 		# "ndepth": int(attributes["ndepths"])
+# 	}
+#
+# 	data_names = lines[2][1:].split()
+# 	data = {name: (["ndepths"], []) for name in data_names}
+# 	for line in lines[3:-1]:
+# 		# values = list(map(ast.literal_eval, line.split()))
+# 		values = np.fromstring(line, sep="\t")
+# 		for name, val in zip(data_names, values):
+# 			if name == "nobs":
+# 				val = int(val)
+# 			data[name][1].append(val)
+#
+# 	ds = xr.Dataset(data_vars=data, coords=coords, attrs=attributes)
+# 	ds.to_netcdf(os.path.join(get_itp_cache_dir(), f"{os.path.basename(filepath)}.nc"))
+# 	return ds
 
 
 # def parser_all_itp_xr(limit: int = None) -> None:
@@ -565,9 +577,18 @@ def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', 
 	return itp_range
 
 
-# itp_range should now contain only the groups that match your conditions
-def interp_itps(itps):
-
+def interp_itps(itp, dims, x_inter, base_dim, **kwargs):
+	# This will take dims as y for interpolation
+	# such as dims = f(base_dim)
+	# then take x_inter, a range of point on which to interpolate
+	# it will return?? a dict? a new df?
+	# if it returns a df, should the input be a df?
+	# Handle NaNs
+	interp_itp = dict()
+	for dim in dims:
+		x_inter = np.arange(10, 760, 10)
+		interp_itp[dim] = np.interp(x_inter, itp[base_dim], itp[dim])
+	return interp_itp
 
 
 def preload_itp(**kwargs) -> str:
