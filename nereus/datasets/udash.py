@@ -5,6 +5,7 @@ import os
 import shutil
 
 from datetime import datetime, date
+from functools import partial
 from multiprocessing import Pool
 
 import numpy as np
@@ -27,20 +28,42 @@ UDASH_COLUMN_TYPE = {
 	'Station': str,
 	'Platform': str,
 	'Type': str,
-	'yyyy-mm-ddThh:mm': datetime,
+	# 'yyyy-mm-ddThh:mm': datetime,
 	'Longitude_[deg]': float,
 	'Latitude_[deg]': float,
 	'Pressure_[dbar]': float,
 	'Depth_[m]': float,
 	'QF_Depth_[m]': int,
-	'Temp[C]': float,
-	'QF_Temp[C]': int,
+	'Temp_[C]': float,
+	'QF_Temp_[C]': int,
 	'Salinity_[psu]': float,
 	'QF_Salinity_[psu]': int,
 	'Source': str,
 	'DOI': str,
 	'WOD-Cruise-ID': str,
 	'WOD-Cast-ID': str,
+}
+
+rename_col = {
+	# 'Prof_no': int,
+	# 'Cruise': str,
+	# 'Station': str,
+	# 'Platform': str,
+	# 'Type': str,
+	'yyyy-mm-ddThh:mm': "time",
+	'Longitude_[deg]':  "lon",
+	'Latitude_[deg]':   "lat",
+	'Pressure_[dbar]':  "press",
+	'Depth_[m]':        "depth",
+	# 'QF_Depth_[m]': int,
+	'Temp_[C]':          "temp",
+	# 'QF_Temp_[C]': int,
+	'Salinity_[psu]':   "sal",
+	# 'QF_Salinity_[psu]': int,
+	# 'Source': str,
+	# 'DOI': str,
+	# 'WOD-Cruise-ID': str,
+	# 'WOD-Cast-ID': str,
 }
 
 
@@ -88,7 +111,46 @@ def _udash_fileparser(filepath: str):
 					except ValueError:
 						pass
 			data[key].append(v)
+
+	data = pd.DataFrame(data)
+	data = data.astype(UDASH_COLUMN_TYPE)
+	data.replace(-999, np.nan, inplace=True)
+	data.rename(columns=rename_col, inplace=True)
+	data["time"] = pd.to_datetime(data["time"])
 	return data
+
+
+def parse_all_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
+	udash_extracted_dir = get_udash_extracted_dir()
+	if files is None:
+		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+
+	if files_nbr is not None:
+		files = files[:files_nbr]
+
+	logger.info(f"{len(files)} udash files to parse.")
+
+	udash = []
+	for f in track(files, description="UDASH files parsing"):
+		df = _udash_fileparser(f)
+		udash.append(df)
+
+	udash = pd.concat(udash, ignore_index=True)
+
+	if filter:
+		# Use the filter method to apply the conditions to each group
+		udash_range = udash.groupby('file').filter(
+			partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
+		)
+
+
+def filter_groups(group, dim, low, high, min_nobs):
+	mask = (
+		group[dim].max() >= high and
+		group[dim].min() <= low and
+		len(group[dim]) > min_nobs
+	)
+	return mask
 
 
 def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
@@ -116,12 +178,12 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, ca
 
 	if cache == "parqet":
 		df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
-	if cache == "xarray":
-		df = udash_xr(df, save=True)
+	# if cache == "xarray":
+	# 	df = udash_xr(df, save=True)
 	return df
 
 
-def convert_type(df: pl.DataFrame):
+def convert_type(df: pl.DataFrame) -> pd.DataFrame:
 	col = df.columns
 	# TODO: can just hard-code the column I want to change, instead of getting the column from the df
 	# Though, what if one column does not exist, it would return an error
@@ -183,6 +245,57 @@ def load_udash(
 	if cache == "parquet":
 		udash = pd.read_parquet(udash_filepath)
 	return udash
+
+
+def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+	# This will take dims as y for interpolation
+	# such as dims = f(base_dim)
+	# then take x_inter, a range of point on which to interpolate
+	# it will return?? a dict? a new df?
+	# if it returns a df, should the input be a df?
+	# Handle NaNs
+	# Can remove the nans.
+	# or just quickly to pd interp?
+	# That could be a parameter
+
+	x_inter = np.arange(10, 760, 10)
+	interp_itp = {
+		"file": udash["file"].values[:len(x_inter)],  # So everything has the same length
+		base_dim: x_inter
+	}
+
+	for dim in dims:
+		if dim in udash:
+			interp_itp[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
+		else:
+			interp_itp[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_itp)
+
+
+def preload_itp(**kwargs):
+	# check download
+	# parse
+	udash = parse_all_udash()
+	logger.info("Parsed")
+	processed_itps = []
+
+	for itp in tqdm(udash):
+		new_itp = interp_udash(itp, **kwargs)
+		processed_itps.append(new_itp)
+
+	logger.info("Concat")
+	df_itps = pd.concat(processed_itps, ignore_index=True)
+
+	df_itps.rename(columns=rename_col, inplace=True)
+
+	logger.info("Caching")
+	df_itps.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+
+	# TODO: To xarray
+	# itps_to_xr(df_itps)
+	# save
+	return df_itps
+
 
 
 def main():
