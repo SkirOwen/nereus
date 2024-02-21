@@ -263,7 +263,13 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 		logger.info("All ITPs have been extracted.")
 
 
-def itp_parser(filepath: str, filtering: bool, nbr_filter: int = 2, low_filter: float = 10.0, high_filter: float = 750.0):
+def itp_parser(
+		filepath: str,
+		filtering: bool = True,
+		nbr_filter: int = 2,
+		low_filter: float = 10.0,
+		high_filter: float = 750.0,
+	) -> tuple[pd.DataFrame, dict] | None:
 	"""
 	Parse data from an ITP file.
 
@@ -300,13 +306,13 @@ def itp_parser(filepath: str, filtering: bool, nbr_filter: int = 2, low_filter: 
 
 	if filtering:
 		if len(lines) <= nbr_filter + 5:
-			return
+			return None
 
 		if float(lines[3].split()[0]) >= low_filter:
-			return
+			return None
 
 		if float(lines[-2].split()[0]) <= high_filter:
-			return
+			return None
 
 	# the header of the metadata is in two parts separated by a colon
 	# the left part follows this:
@@ -349,7 +355,7 @@ def itp_parser(filepath: str, filtering: bool, nbr_filter: int = 2, low_filter: 
 	if "nobs" in data_names:
 		data["nobs"] = list(map(int, data["nobs"]))
 
-	return data, metadata
+	return pd.DataFrame(data), metadata
 
 #
 # def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
@@ -505,10 +511,16 @@ def parser_all_itp(limit: int = None) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
-			itps.append(data)
-			metadatas.append(metadata)
-	return itps, metadatas
+		for results in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
+			if results is not None:
+				data, metadata = results
+				itps.append(data)
+				metadatas.append(metadata)
+
+	metadata = pd.DataFrame(metadatas)
+	metadata = metadata.set_index("file")
+	logger.info(f"{len(itps)} itps matching filter")
+	return itps, metadata
 
 
 def itps_to_df(save_df: bool = True, regenerate: bool = False):
