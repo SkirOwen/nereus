@@ -51,7 +51,7 @@ col_meta = [
 
 
 rename_col = {
-	'pressure(dbar)': "pressure",
+	'pressure(dbar)': "pres",
 	'temperature(C)': "temp",
 	'salinity': "sal",
 	'east(cm/s)': "east",
@@ -61,11 +61,11 @@ rename_col = {
 	# 'PAR(uE/m^2/s)':,
 	# 'turbidity(/m/sr)x10^4',
 	# 'chlorophyll-a(ug/l)',
-	# 'dissolved_oxygen(umol/kg)',
+	'dissolved_oxygen(umol/kg)': "dis_oxy",
 	# 'turbidity(e-4)',
 	# 'chlorophyll_a(ug/l)',
-	'longitude(E+)': "longitude",
-	'latitude(N+)': "latitude",
+	'longitude(E+)': "lon",
+	'latitude(N+)': "lat",
 	# 'ndepths',
 	# 'time'
 }
