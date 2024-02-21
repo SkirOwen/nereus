@@ -581,15 +581,7 @@ def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', 
 		)
 		return mask
 
-	# Use the filter method to apply the conditions to each group
-	itp_range = itps.groupby('file').filter(
-		partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
-	)
-	itp_range.write_parquet(os.path.join(get_itp_dir(), "itps_range.parquet"))
-	return itp_range
-
-
-def interp_itps(itp, dims, x_inter, base_dim, **kwargs):
+def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
 	# This will take dims as y for interpolation
 	# such as dims = f(base_dim)
 	# then take x_inter, a range of point on which to interpolate
