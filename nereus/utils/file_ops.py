@@ -41,3 +41,11 @@ def calculate_md5(file_path: str) -> str:
 		for chunk in iter(lambda: f.read(4096), b""):
 			hash_md5.update(chunk)
 	return hash_md5.hexdigest()
+
+
+def create_cache_filename(name: str, ext: str, *args):
+	combined_args = "_".join(map(str, args))
+
+	hash_object = hashlib.md5(combined_args.encode())
+	hash_string = hash_object.hexdigest()
+	return f"name_{hash_string}.{ext}"

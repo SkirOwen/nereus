@@ -12,6 +12,8 @@ import urllib.request
 import aiohttp
 import asyncio
 
+from functools import partial
+
 from urllib.parse import urljoin
 
 from concurrent.futures import ThreadPoolExecutor
@@ -31,6 +33,7 @@ from nereus.utils.file_ops import calculate_md5
 from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir, get_itp_cache_dir
 from nereus.utils.iterable_ops import skipwise
 
+
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
@@ -46,6 +49,27 @@ col_meta = [
 	'file', 'source', 'ITP', 'profile', 'year', 'day', 'longitude(E+)',
 	'latitude(N+)', 'ndepths', 'time'
 ]
+
+
+rename_col = {
+	'pressure(dbar)': "pres",
+	'temperature(C)': "temp",
+	'salinity': "sal",
+	'east(cm/s)': "east",
+	'north(cm/s)': "north",
+	'vert(cm/s)': "vert",
+	'CDOM(ppb)': "CDOM",
+	# 'PAR(uE/m^2/s)':,
+	# 'turbidity(/m/sr)x10^4',
+	# 'chlorophyll-a(ug/l)',
+	'dissolved_oxygen(umol/kg)': "dis_oxy",
+	# 'turbidity(e-4)',
+	# 'chlorophyll_a(ug/l)',
+	'longitude(E+)': "lon",
+	'latitude(N+)': "lat",
+	# 'ndepths',
+	# 'time'
+}
 
 
 async def async_get_filenames_from_url(url: str) -> list[str]:
@@ -240,7 +264,13 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 		logger.info("All ITPs have been extracted.")
 
 
-def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
+def itp_parser(
+		filepath: str,
+		filtering: bool = True,
+		nbr_filter: int = 2,
+		low_filter: float = 10.0,
+		high_filter: float = 750.0,
+	) -> tuple[pd.DataFrame, dict] | None:
 	"""
 	Parse data from an ITP file.
 
@@ -254,6 +284,10 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	----------
 	filepath : str
 		The path to the ITP file to be parsed.
+	filtering
+	nbr_filter
+	low_filter
+	high_filter
 
 	Returns
 	-------
@@ -271,6 +305,16 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	with open(filepath, "r") as f:
 		lines = f.readlines()
 
+	if filtering:
+		if len(lines) <= nbr_filter + 5:
+			return None
+
+		if float(lines[3].split()[0]) >= low_filter:
+			return None
+
+		if float(lines[-2].split()[0]) <= high_filter:
+			return None
+
 	# the header of the metadata is in two parts separated by a colon
 	# the left part follows this:
 	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
@@ -280,11 +324,11 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	# Line 0 and 1 stores the metadata
 	# Using re to remove the "%", ":", "," character form the string
-	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
+	instrument_info = re.sub(r"[%,]", "", instrument_info).lower().split()
 
 	metadata.update(skipwise(instrument_info, step=2))
 
-	attribute_names = re.sub(r"[%,]", "", attribute_names).split()
+	attribute_names = re.sub(r"[%,]", "", attribute_names).lower().split()
 	metadata_values = list(map(ast.literal_eval, lines[1].split()))
 	# casting the float values of the metadata to floats as they are stored in str
 
@@ -297,6 +341,7 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 
 	# The name of the variables are stored on line 2
 	data_names = lines[2][1:].split()
+	# name.lower().split("(")[0] would remove the unit and parenthesis
 	data = {name: [] for name in data_names}
 
 	# The data start at line 3
@@ -311,148 +356,7 @@ def itp_parser(filepath: str, progress_bar=None) -> tuple[dict, dict]:
 	if "nobs" in data_names:
 		data["nobs"] = list(map(int, data["nobs"]))
 
-	if progress_bar is not None:
-		progress_bar.update(1)
-
-	return data, metadata
-
-
-def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
-	"""
-	Parse data from an ITP file.
-
-	This function reads data from the specified ITP file and extracts both metadata
-	and data values.
-
-	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
-	and data starting from the fourth line until the end.
-
-	Parameters
-	----------
-	filepath : str
-		The path to the ITP file to be parsed.
-
-	Returns
-	-------
-	tuple of dict and dict
-		A tuple containing two dictionaries:
-			- The first dictionary contains the parsed data values, where keys are variable names
-			and values are lists of corresponding data points.
-			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
-	"""
-	attributes = {
-		"source": "ITP",
-	}
-
-	with open(filepath, "r") as f:
-		lines = f.readlines()
-
-	# the header of the metadata is in two parts separated by a colon
-	# the left part follows this:
-	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
-	# the right part this one:
-	# NAME NAME NAME NAME
-	instrument_info, attributes_names = lines[0].split(":")
-
-	# Line 0 and 1 stores the metadata
-	# Using re to remove the "%", ":", "," character form the string
-	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
-
-	attributes.update(skipwise(instrument_info, step=2))
-
-	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
-
-	# Cleaning the name of the attributes
-	replacements = {"longitude(E+)": "longitude", "latitude(N+)": "latitude"}
-	attributes_names = [replacements.get(item, item) for item in attributes_names]
-
-	attributes_values = lines[1].split()
-	# casting the float values of the metadata to floats as they are stored in str
-
-	attributes.update(zip(attributes_names, attributes_values))
-
-	# The name of the variables are stored on line 2
-	coords = {
-		'longitude': float(attributes["longitude"]),
-		'latitude': float(attributes["latitude"]),
-		'time':
-			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
-			datetime.timedelta(days=float(attributes["day"]) - 1), # -1 because Jan 1st is day 1.0000
-		# "ndepth": int(attributes["ndepths"])
-	}
-
-	data_names = lines[2][1:].split()
-	data = {name: (["ndepths"], []) for name in data_names}
-	for line in lines[3:-1]:
-		# values = list(map(ast.literal_eval, line.split()))
-		values = np.fromstring(line, sep="\t")
-		for name, val in zip(data_names, values):
-			if name == "nobs":
-				val = int(val)
-			data[name][1].append(val)
-
-	ds = xr.Dataset(data_vars=data, coords=coords, attrs=attributes)
-	ds.to_netcdf(os.path.join(get_itp_cache_dir(), f"{os.path.basename(filepath)}.nc"))
-	return ds
-
-
-def parser_all_itp_xr(limit: int = None) -> None:
-	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
-	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
-	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
-	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
-	logger.info(f"Found {len(files)} ITPs to parse")
-
-	if limit is not None and limit <= len(files):
-		logger.info(f"Only parsing {limit} files")
-		files = files[:limit]
-
-	itp_sizes = []
-
-	with Pool() as pool:
-		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
-			itp_sizes.append(itp.sizes["ndepths"])
-
-	with open(os.path.join(get_itp_cache_dir(), "cache_size"), "w") as f:
-		f.write(str(max(itp_sizes)))
-
-	return max(itp_sizes)
-
-
-def load_all_itp_xr() -> xr.Dataset:
-	cache_dir = get_itp_cache_dir()
-	files = glob.glob(os.path.join(cache_dir, "*.nc"))
-
-	if os.path.exists(os.path.join(cache_dir, "cache_size")):
-		with open(os.path.join(get_itp_cache_dir(), "cache_size"), "r") as f:
-			max_length = int(f.readlines()[0])
-	else:
-		max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
-
-	pbar = tqdm(desc="file", total=len(files), bar_format='{l_bar}{bar}{r_bar}')
-
-	with pbar as t:
-		def preprocess(ds):
-			padding = max_length - ds.sizes["ndepths"]
-			ds = ds.pad({"ndepths": (0, padding)})
-			t.update(1)
-			return ds
-
-		itp = xr.open_mfdataset(
-			files,
-			parallel=True,
-			preprocess=preprocess,
-			combine="nested",
-			concat_dim="time",
-			chunks={},
-		)
-	logger.info("Opening done")
-	itp["nobs"] = itp["nobs"].astype(np.int32)
-
-	logger.info("Saving to file")
-	itp.to_netcdf(os.path.join(get_itp_cache_dir(), f"all_itp_{len(files)}.nc"))
-
-	return itp
+	return pd.DataFrame(data), metadata
 
 
 def parser_all_itp(limit: int = None) -> tuple:
@@ -470,11 +374,16 @@ def parser_all_itp(limit: int = None) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for data, metadata in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
-			itps.append(data)
-			metadatas.append(metadata)
+		for results in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
+			if results is not None:
+				data, metadata = results
+				itps.append(data)
+				metadatas.append(metadata)
 
-	return itps, metadatas
+	metadata = pd.DataFrame(metadatas)
+	metadata = metadata.set_index("file")
+	logger.info(f"{len(itps)} itps matching filter")
+	return itps, metadata
 
 
 def itps_to_df(save_df: bool = True, regenerate: bool = False):
@@ -503,7 +412,7 @@ def itps_to_df(save_df: bool = True, regenerate: bool = False):
 	return df_itps, df_metadatas
 
 
-def load_itp(regenerate: bool = False):
+def load_itp(regenerate: bool = False, join: bool = False):
 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
 
@@ -514,20 +423,71 @@ def load_itp(regenerate: bool = False):
 
 	df_itps = pd.read_parquet(itps_filepath)
 	df_metadatas = pd.read_csv(metadata_filepath)
-	return df_itps, df_metadatas
+	if join:
+		df_metadatas = df_metadatas.set_index("file")
+		return df_itps.join(df_metadatas, on="file")
+	else:
+		return df_itps, df_metadatas
 
 
-def query_from_metadata(query: str) -> list:
-	# load metadata file
-	# find file names to load
-	# delay load
-	pass
+def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+	# This will take dims as y for interpolation
+	# such as dims = f(base_dim)
+	# then take x_inter, a range of point on which to interpolate
+	# it will return?? a dict? a new df?
+	# if it returns a df, should the input be a df?
+	# Handle NaNs
+	# Can remove the nans.
+	# or just quickly to pd interp?
+	# That could be a parameter
+
+	x_inter = np.arange(10, 760, 10)
+	interp_itp = {
+		"file": itp["file"].values[:len(x_inter)],  # So everything has the same length
+		base_dim: x_inter
+	}
+
+	for dim in dims:
+		if dim in itp:
+			interp_itp[dim] = np.interp(x_inter, itp[base_dim].values, itp[dim].values)
+		else:
+			interp_itp[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_itp)
+
+
+def preload_itp(**kwargs):
+	# check download
+	# parse
+	itps, metadatas = parser_all_itp()
+	logger.info("Parsed")
+	processed_itps = []
+
+	for itp in tqdm(itps):
+		new_itp = interp_itps(itp, **kwargs)
+		processed_itps.append(new_itp)
+
+	logger.info("Concat")
+	df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+
+	logger.info("Join")
+	df_itps = df_itps.join(metadatas, on="file")
+
+	df_itps.rename(columns=rename_col, inplace=True)
+
+	logger.info("Caching")
+	df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+
+	# TODO: To xarray
+	# itps_to_xr(df_itps)
+	# save
+	return df_itps
 
 
 def main():
+	pass
 	# download_itp(override=True)
 	# parser_all_itp_xr()
-	load_all_itp_xr()
+	# load_all_itp_xr()
 
 
 # itps_to_df()
