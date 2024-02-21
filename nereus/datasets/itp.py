@@ -33,6 +33,7 @@ from nereus.utils.file_ops import calculate_md5
 from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir, get_itp_cache_dir
 from nereus.utils.iterable_ops import skipwise
 
+
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
@@ -357,144 +358,6 @@ def itp_parser(
 
 	return pd.DataFrame(data), metadata
 
-#
-# def itp_parser_xr(filepath: str, progress_bar=None) -> xr.Dataset:
-# 	"""
-# 	Parse data from an ITP file.
-#
-# 	This function reads data from the specified ITP file and extracts both metadata
-# 	and data values.
-#
-# 	The ITP file format is assumed to have metadata on the first two lines, variable names on the third line,
-# 	and data starting from the fourth line until the end.
-#
-# 	Parameters
-# 	----------
-# 	filepath : str
-# 		The path to the ITP file to be parsed.
-#
-# 	Returns
-# 	-------
-# 	tuple of dict and dict
-# 		A tuple containing two dictionaries:
-# 			- The first dictionary contains the parsed data values, where keys are variable names
-# 			and values are lists of corresponding data points.
-# 			- The second dictionary contains the parsed metadata of the itp, saved in the same order.
-# 	"""
-# 	attributes = {
-# 		"source": "ITP",
-# 	}
-#
-# 	with open(filepath, "r") as f:
-# 		lines = f.readlines()
-#
-# 	# the header of the metadata is in two parts separated by a colon
-# 	# the left part follows this:
-# 	# %NAME VALUE, NAME VALUE, ..., NAME VALUE
-# 	# the right part this one:
-# 	# NAME NAME NAME NAME
-# 	instrument_info, attributes_names = lines[0].split(":")
-#
-# 	# Line 0 and 1 stores the metadata
-# 	# Using re to remove the "%", ":", "," character form the string
-# 	instrument_info = re.sub(r"[%,]", "", instrument_info).split()
-#
-# 	attributes.update(skipwise(instrument_info, step=2))
-#
-# 	attributes_names = re.sub(r"[%,]", "", attributes_names).split()
-#
-# 	# Cleaning the name of the attributes
-# 	replacements = {"longitude(E+)": "longitude", "latitude(N+)": "latitude"}
-# 	attributes_names = [replacements.get(item, item) for item in attributes_names]
-#
-# 	attributes_values = lines[1].split()
-# 	# casting the float values of the metadata to floats as they are stored in str
-#
-# 	attributes.update(zip(attributes_names, attributes_values))
-#
-# 	# The name of the variables are stored on line 2
-# 	coords = {
-# 		'longitude': float(attributes["longitude"]),
-# 		'latitude': float(attributes["latitude"]),
-# 		'time':
-# 			datetime.datetime(year=int(attributes["year"]), month=1, day=1) +
-# 			datetime.timedelta(days=float(attributes["day"]) - 1), # -1 because Jan 1st is day 1.0000
-# 		# "ndepth": int(attributes["ndepths"])
-# 	}
-#
-# 	data_names = lines[2][1:].split()
-# 	data = {name: (["ndepths"], []) for name in data_names}
-# 	for line in lines[3:-1]:
-# 		# values = list(map(ast.literal_eval, line.split()))
-# 		values = np.fromstring(line, sep="\t")
-# 		for name, val in zip(data_names, values):
-# 			if name == "nobs":
-# 				val = int(val)
-# 			data[name][1].append(val)
-#
-# 	ds = xr.Dataset(data_vars=data, coords=coords, attrs=attributes)
-# 	ds.to_netcdf(os.path.join(get_itp_cache_dir(), f"{os.path.basename(filepath)}.nc"))
-# 	return ds
-
-
-# def parser_all_itp_xr(limit: int = None) -> None:
-# 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
-# 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
-# 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
-# 	files = list(set(all_files) - (set(micro_files) | set(sami_files)))
-# 	logger.info(f"Found {len(files)} ITPs to parse")
-#
-# 	if limit is not None and limit <= len(files):
-# 		logger.info(f"Only parsing {limit} files")
-# 		files = files[:limit]
-#
-# 	itp_sizes = []
-#
-# 	with Pool() as pool:
-# 		for itp in tqdm(pool.imap(itp_parser_xr, files), total=len(files), desc="Parsing itps"):
-# 			itp_sizes.append(itp.sizes["ndepths"])
-#
-# 	with open(os.path.join(get_itp_cache_dir(), "cache_size"), "w") as f:
-# 		f.write(str(max(itp_sizes)))
-#
-# 	return max(itp_sizes)
-
-
-# def load_all_itp_xr() -> xr.Dataset:
-# 	cache_dir = get_itp_cache_dir()
-# 	files = glob.glob(os.path.join(cache_dir, "*.nc"))
-#
-# 	if os.path.exists(os.path.join(cache_dir, "cache_size")):
-# 		with open(os.path.join(get_itp_cache_dir(), "cache_size"), "r") as f:
-# 			max_length = int(f.readlines()[0])
-# 	else:
-# 		max_length = max(xr.open_dataset(f).sizes["ndepths"] for f in tqdm(files, desc="total size"))
-#
-# 	pbar = tqdm(desc="file", total=len(files), bar_format='{l_bar}{bar}{r_bar}')
-#
-# 	with pbar as t:
-# 		def preprocess(ds):
-# 			padding = max_length - ds.sizes["ndepths"]
-# 			ds = ds.pad({"ndepths": (0, padding)})
-# 			t.update(1)
-# 			return ds
-#
-# 		itp = xr.open_mfdataset(
-# 			files,
-# 			parallel=True,
-# 			preprocess=preprocess,
-# 			combine="nested",
-# 			concat_dim="time",
-# 			chunks={},
-# 		)
-# 	logger.info("Opening done")
-# 	itp["nobs"] = itp["nobs"].astype(np.int32)
-#
-# 	logger.info("Saving to file")
-# 	itp.to_netcdf(os.path.join(get_itp_dir(), f"all_itp_{len(files)}.nc"))
-#
-# 	return itp
-
 
 def parser_all_itp(limit: int = None) -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
@@ -565,28 +428,6 @@ def load_itp(regenerate: bool = False, join: bool = False):
 		return df_itps.join(df_metadatas, on="file")
 	else:
 		return df_itps, df_metadatas
-
-
-# def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', low: float = 10.0, high: float = 750.0, min_nobs: int = 2):
-# 	itps = load_itp(join=True) if itps is None else itps
-#
-# 	itps = itps.rename(rename_col)
-#
-# 	# Define a function to apply your conditions
-# 	def filter_groups(group, dim, low, high, min_nobs):
-# 		mask = (
-# 			group[dim].max() >= high and
-# 			group['pressure(dbar)'].min() <= low and
-# 			group["nobs"] > min_nobs
-# 		)
-# 		return mask
-#
-# 	# Use the filter method to apply the conditions to each group
-# 	itp_range = itps.groupby('file').filter(
-# 		partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
-# 	)
-# 	itp_range.write_parquet(os.path.join(get_itp_dir(), "itps_range.parquet"))
-# 	return itp_range
 
 
 def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
