@@ -606,26 +606,39 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 	return pd.DataFrame(interp_itp)
 
 
-def preload_itp(**kwargs) -> str:
+def preload_itp(**kwargs):
 	# check download
 	# parse
-	# itp, metadata = parser_all_itp()
+	itps, metadatas = parser_all_itp()
+	logger.info("Parsed")
+	processed_itps = []
 
-	# concat
-	itps = load_itp(join=True)
-	# filter range
-	itps = select_range(itps)
-	# interpolate
-	itps_inter = interp_itps(itps)
-	# convert to xarray
+	for itp in tqdm(itps):
+		new_itp = interp_itps(itp, **kwargs)
+		processed_itps.append(new_itp)
+
+	logger.info("Concat")
+	df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+
+	logger.info("Join")
+	df_itps = df_itps.join(metadatas, on="file")
+
+	df_itps.rename(columns=rename_col, inplace=True)
+
+	logger.info("Caching")
+	df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+
+	# TODO: To xarray
+	# itps_to_xr(df_itps)
 	# save
-	return ""
+	return df_itps
 
 
 def main():
+	pass
 	# download_itp(override=True)
 	# parser_all_itp_xr()
-	load_all_itp_xr()
+	# load_all_itp_xr()
 
 
 # itps_to_df()
