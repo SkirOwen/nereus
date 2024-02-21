@@ -596,11 +596,22 @@ def interp_itps(itp, dims, x_inter, base_dim, **kwargs):
 	# it will return?? a dict? a new df?
 	# if it returns a df, should the input be a df?
 	# Handle NaNs
-	interp_itp = dict()
+	# Can remove the nans.
+	# or just quickly to pd interp?
+	# That could be a parameter
+
+	x_inter = np.arange(10, 760, 10)
+	interp_itp = {
+		"file": itp["file"].values[:len(x_inter)],  # So everything has the same length
+		base_dim: x_inter
+	}
+
 	for dim in dims:
-		x_inter = np.arange(10, 760, 10)
-		interp_itp[dim] = np.interp(x_inter, itp[base_dim], itp[dim])
-	return interp_itp
+		if dim in itp:
+			interp_itp[dim] = np.interp(x_inter, itp[base_dim].values, itp[dim].values)
+		else:
+			interp_itp[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_itp)
 
 
 def preload_itp(**kwargs) -> str:
