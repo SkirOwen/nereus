@@ -567,19 +567,27 @@ def load_itp(regenerate: bool = False, join: bool = False):
 		return df_itps, df_metadatas
 
 
-def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', low: float = 10.0, high: float = 750.0, min_nobs: int = 2):
-	itps = load_itp(join=True) if itps is None else itps
+# def select_range(itps: pd.DataFrame | None = None, dim: str = 'pressure(dbar)', low: float = 10.0, high: float = 750.0, min_nobs: int = 2):
+# 	itps = load_itp(join=True) if itps is None else itps
+#
+# 	itps = itps.rename(rename_col)
+#
+# 	# Define a function to apply your conditions
+# 	def filter_groups(group, dim, low, high, min_nobs):
+# 		mask = (
+# 			group[dim].max() >= high and
+# 			group['pressure(dbar)'].min() <= low and
+# 			group["nobs"] > min_nobs
+# 		)
+# 		return mask
+#
+# 	# Use the filter method to apply the conditions to each group
+# 	itp_range = itps.groupby('file').filter(
+# 		partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
+# 	)
+# 	itp_range.write_parquet(os.path.join(get_itp_dir(), "itps_range.parquet"))
+# 	return itp_range
 
-	itps = itps.rename(rename_col)
-
-	# Define a function to apply your conditions
-	def filter_groups(group, dim, low, high, min_nobs):
-		mask = (
-			group[dim].max() >= high and
-			group['pressure(dbar)'].min() <= low and
-			group["nobs"] > min_nobs
-		)
-		return mask
 
 def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
 	# This will take dims as y for interpolation
