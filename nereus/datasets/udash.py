@@ -115,6 +115,7 @@ def _udash_fileparser(filepath: str):
 	data = pd.DataFrame(data)
 	data = data.astype(UDASH_COLUMN_TYPE)
 	data.replace(-999, np.nan, inplace=True)
+	data.replace("-999", "", inplace=True)
 	data.rename(columns=rename_col, inplace=True)
 	data["time"] = pd.to_datetime(data["time"])
 	return data
@@ -131,9 +132,13 @@ def parse_all_udash(files: None | list[str] = None, files_nbr: None | int = None
 	logger.info(f"{len(files)} udash files to parse.")
 
 	udash = []
-	for f in track(files, description="UDASH files parsing"):
-		df = _udash_fileparser(f)
-		udash.append(df)
+
+	with Pool() as pool:
+		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
+			udash.append(data)
+	# for f in track(files, description="UDASH files parsing"):
+	# 	df = _udash_fileparser(f)
+	# 	udash.append(df)
 
 	udash = pd.concat(udash, ignore_index=True)
 
