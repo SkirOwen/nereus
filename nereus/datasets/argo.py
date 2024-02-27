@@ -60,8 +60,11 @@ def interp_argo(argo: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **k
 def preload() -> str:
 	# check download
 	# parse
-	argos = parser_all_argo()
-	logger.info("Parsed")
+	argos = load_all_argo()
+	logger.info("Argo Loaded")
+
+
+
 	processed_argo = []
 
 	for itp in tqdm(argos):
