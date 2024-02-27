@@ -84,7 +84,7 @@ def _extract_udash(file: None | str = None) -> None:
 	)
 
 
-def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True,):
+def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True) -> pd.DataFrame:
 	lines = []
 	with open(filepath, "r") as f:
 		for line in f:
@@ -114,17 +114,17 @@ def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool =
 			data[key].append(v)
 
 	data = pd.DataFrame(data)
-	logger.info("Clean")
+	# logger.info("Clean")
 	data = clean_df_udash(data)
 
-	logger.info("argo")
+	# logger.info("argo")
 	if remove_argo:
 		data.query('Source != "argo"', inplace=True)
-	logger.info("itp")
+	# logger.info("itp")
 	if remove_itp:
 		data.query('not Cruise.str.contains("itp")', inplace=True)
 
-	logger.info("filter")
+	# logger.info("filter")
 	if filtering:
 		# Use the filter method to apply the conditions to each group
 		data = data.groupby('Prof_no').filter(
@@ -133,8 +133,19 @@ def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool =
 	return data
 
 
-def clean_df_udash(data, col_to_drop: None | list[str] = None):
-	col_to_drop = ["Station", "Platform", "Type", "QF_Depth_[m]", "QF_Temp_[C]", "QF_Salinity_[psu]", "DOI", "WOD-Cruise-ID", "WOD-Cast-ID"]
+def clean_df_udash(data, col_to_drop: None | list[str] = None) -> pd.DataFrame:
+	col_to_drop = [
+		"Station",
+		"Platform",
+		"Type",
+		"Depth_[m]",
+		"QF_Depth_[m]",
+		"QF_Temp_[C]",
+		"QF_Salinity_[psu]",
+		"DOI",
+		"WOD-Cruise-ID",
+		"WOD-Cast-ID"
+	]
 	data.drop(
 		col_to_drop,
 		axis=1,
@@ -156,7 +167,7 @@ def clean_df_udash(data, col_to_drop: None | list[str] = None):
 	return data
 
 
-def parse_all_udash(files_nbr: None | int = None):
+def parse_all_udash(files_nbr: None | int = None) -> pd.DataFrame:
 	udash_extracted_dir = get_udash_extracted_dir()
 	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
@@ -176,9 +187,6 @@ def parse_all_udash(files_nbr: None | int = None):
 	# 	udash.append(df)
 
 	udash = pd.concat(udash, ignore_index=True)
-
-	udash.rename(columns=rename_col, inplace=True)
-	udash = udash[udash.time.notnull()]
 
 	return udash
 
@@ -234,23 +242,23 @@ def filter_groups(group, dim, low, high, min_nobs):
 # 	return df
 
 
-def udash_xr(df: pd.DataFrame, save: bool = True) -> xr.Dataset:
-	logger.info("Converting to xarray")
-	ds = xr.Dataset.from_dataframe(df)
-	ds = ds.rename({
-		"yyyy-mm-ddThh:mm": "time",
-		"Longitude_[deg]": "lon",
-		"Latitude_[deg]": "lat",
-	})
-	ds = ds.set_coords("time")
-	ds = ds.swap_dims({"index": "time"})
-	ds = ds.drop_vars("index")
-	ds = ds.set_coords(["lon", "lat"])
-	logger.info("Converted!")
-	if save:
-		logger.info("Caching")
-		ds.to_netcdf(os.path.join(get_udash_dir(), "udash.nc"))
-	return ds
+# def udash_xr(df: pd.DataFrame, save: bool = True) -> xr.Dataset:
+# 	logger.info("Converting to xarray")
+# 	ds = xr.Dataset.from_dataframe(df)
+# 	ds = ds.rename({
+# 		"yyyy-mm-ddThh:mm": "time",
+# 		"Longitude_[deg]": "lon",
+# 		"Latitude_[deg]": "lat",
+# 	})
+# 	ds = ds.set_coords("time")
+# 	ds = ds.swap_dims({"index": "time"})
+# 	ds = ds.drop_vars("index")
+# 	ds = ds.set_coords(["lon", "lat"])
+# 	logger.info("Converted!")
+# 	if save:
+# 		logger.info("Caching")
+# 		ds.to_netcdf(os.path.join(get_udash_dir(), "udash.nc"))
+# 	return ds
 
 
 # def load_udash(
@@ -298,46 +306,75 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, *
 	# That could be a parameter
 
 	x_inter = np.arange(10, 760, 10)
-	interp_itp = {
-		"file": udash["file"].values[:len(x_inter)],  # So everything has the same length
-		base_dim: x_inter
+	interp_udash = {
+		"profile":  np.full(x_inter.shape, udash["profile"].values[0]),  # So everything has the same length
+		"cruise":   np.full(x_inter.shape, udash["cruise"].values[0]),
+		"time":     np.full(x_inter.shape, udash["time"].values[0]),
+		"lat":      np.full(x_inter.shape, udash["lat"].values[0]),
+		"lon":      np.full(x_inter.shape, udash["lon"].values[0]),
+		"source":   np.full(x_inter.shape, udash["source"].values[0]),
+		base_dim:   x_inter
 	}
 
 	for dim in dims:
 		if dim in udash:
-			interp_itp[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
+			interp_udash[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
 		else:
-			interp_itp[dim] = np.full(x_inter.shape, np.nan)
-	return pd.DataFrame(interp_itp)
+			interp_udash[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_udash)
 
 
-def preload_itp(**kwargs):
+def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
+	unique_coords = udash.drop_duplicates('profile').set_index('profile')[
+		["lat", "lon", "time", "cruise", "source"]
+	]
+	udash.set_index(["profile", "pres"], inplace=True)
+
+	ds = xr.Dataset.from_dataframe(udash)
+	for coord in ["lat", 'lon', 'time', "cruise", "source"]:
+		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	return ds
+
+
+def preload_udash(**kwargs) -> str:
 	# check download
 	# parse
-	udash = parse_all_udash()
-	logger.info("Parsed")
-	processed_itps = []
+	if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
+		udash = parse_all_udash()
+		udash.rename(columns=rename_col, inplace=True)
+		logger.info("Parsed")
+		processed_udash = []
 
-	for u in tqdm(udash):
-		new_itp = interp_udash(u, **kwargs)
-		processed_itps.append(new_itp)
+		for i, u in tqdm(udash.groupby("profile")):
+			new_u = interp_udash(u, **kwargs)
+			processed_udash.append(new_u)
 
-	logger.info("Concat")
-	df_itps = pd.concat(processed_itps, ignore_index=True)
+		logger.info("Concat")
+		udash = pd.concat(processed_udash, ignore_index=True)
 
-	df_itps.rename(columns=rename_col, inplace=True)
+		udash = udash[udash.time.notnull()]
+		udash.reset_index(inplace=True)
 
-	logger.info("Caching")
-	df_itps.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+		logger.info("Caching")
+		udash.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+	else:
+		udash = pd.read_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
 
-	# TODO: To xarray
-	# itps_to_xr(df_itps)
-	# save
-	return df_itps
+	logger.info("Converting to xarray")
+	ds = udash_to_xr(udash)
+
+	logger.info("Saving xr")
+	save_path = os.path.join(get_udash_dir(), "udash_xr.nc")
+	ds.to_netcdf(
+		save_path,
+		format="NETCDF4",
+		engine="h5netcdf",
+	)
+	return save_path
 
 
 def main():
-	parse_all_udash()
+	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
 
 	# download_udash(URL)
 	# _extract_udash()
