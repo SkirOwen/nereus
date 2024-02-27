@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import glob
 import os
 import shutil
@@ -83,7 +84,7 @@ def _extract_udash(file: None | str = None) -> None:
 	)
 
 
-def _udash_fileparser(filepath: str):
+def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True,):
 	lines = []
 	with open(filepath, "r") as f:
 		for line in f:
@@ -112,24 +113,50 @@ def _udash_fileparser(filepath: str):
 						pass
 			data[key].append(v)
 
-	# This could be as another function to be fair
 	data = pd.DataFrame(data)
-	data = data.astype(UDASH_COLUMN_TYPE)
-	data.replace(-999, np.nan, inplace=True)
-	data.replace("-999", "", inplace=True)
-	data.rename(columns=rename_col, inplace=True)
-	data["time"] = pd.to_datetime(data["time"], errors="coerce")    # This puts NaT for wrong time
-	# print(os.path.basename(filepath), data.time.isnull().sum())
-	data = data[data.time.notnull()]                                # This filters the NaT and drop them
+	logger.info("Clean")
+	data = clean_df_udash(data)
 
-	data.drop(
-		["QF_Depth_[m]", "QF_Temp_[C]", "QF_Salinity_[psu]", "DOI", "WOD-Cruise-ID", "WOD-Cast-ID"],
-		inplace=True
-	)
+	logger.info("argo")
+	if remove_argo:
+		data.query('Source != "argo"', inplace=True)
+	logger.info("itp")
+	if remove_itp:
+		data.query('not Cruise.str.contains("itp")', inplace=True)
+
+	logger.info("filter")
+	if filtering:
+		# Use the filter method to apply the conditions to each group
+		data = data.groupby('Prof_no').filter(
+			partial(filter_groups, dim="Pressure_[dbar]", low=10.0, high=750.0, min_nobs=2)
+		)
 	return data
 
 
-def parse_all_udash(files_nbr: None | int = None, ):
+def clean_df_udash(data, col_to_drop: None | list[str] = None):
+	col_to_drop = ["Station", "Platform", "Type", "QF_Depth_[m]", "QF_Temp_[C]", "QF_Salinity_[psu]", "DOI", "WOD-Cruise-ID", "WOD-Cast-ID"]
+	data.drop(
+		col_to_drop,
+		axis=1,
+		inplace=True,
+	)
+
+	for c in col_to_drop:
+		if c in UDASH_COLUMN_TYPE:
+			UDASH_COLUMN_TYPE.pop(c)
+
+	data = data.astype(UDASH_COLUMN_TYPE)
+	data.replace({-999: np.nan, "-999": np.nan}, inplace=True)
+	data["yyyy-mm-ddThh:mm"] = pd.to_datetime(data["yyyy-mm-ddThh:mm"], errors="coerce")
+	# data.rename(columns=rename_col, inplace=True)
+	# data["time"] = pd.to_datetime(data["time"], errors="coerce")    # This puts NaT for wrong time
+	# print(os.path.basename(filepath), data.time.isnull().sum())
+	# data = data[data.time.notnull()]                                # This filters the NaT and drop them
+
+	return data
+
+
+def parse_all_udash(files_nbr: None | int = None):
 	udash_extracted_dir = get_udash_extracted_dir()
 	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
@@ -140,20 +167,18 @@ def parse_all_udash(files_nbr: None | int = None, ):
 
 	udash = []
 
-	with Pool() as pool:
+	with Pool(6) as pool:
 		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
 			udash.append(data)
-	# for f in track(files, description="UDASH files parsing"):
+			gc.collect()
+	# for f in tqdm(files, desc="UDASH files parsing"):
 	# 	df = _udash_fileparser(f)
 	# 	udash.append(df)
 
 	udash = pd.concat(udash, ignore_index=True)
 
-	if filter:
-		# Use the filter method to apply the conditions to each group
-		udash = udash.groupby('file').filter(
-			partial(filter_groups, dim="pres", low=10.0, high=750.0, min_nobs=2)
-		)
+	udash.rename(columns=rename_col, inplace=True)
+	udash = udash[udash.time.notnull()]
 
 	return udash
 
@@ -293,8 +318,8 @@ def preload_itp(**kwargs):
 	logger.info("Parsed")
 	processed_itps = []
 
-	for itp in tqdm(udash):
-		new_itp = interp_udash(itp, **kwargs)
+	for u in tqdm(udash):
+		new_itp = interp_udash(u, **kwargs)
 		processed_itps.append(new_itp)
 
 	logger.info("Concat")
@@ -311,9 +336,8 @@ def preload_itp(**kwargs):
 	return df_itps
 
 
-
 def main():
-	pass
+	parse_all_udash()
 
 	# download_udash(URL)
 	# _extract_udash()
