@@ -45,22 +45,22 @@ UDASH_COLUMN_TYPE = {
 }
 
 rename_col = {
-	# 'Prof_no': int,
-	# 'Cruise': str,
-	# 'Station': str,
-	# 'Platform': str,
-	# 'Type': str,
+	"Prof_no":          "profile",
+	"Cruise":           "cruise",
+	"Station":          "station",
+	"Platform":         "platform",
+	"Type":             "type",
 	'yyyy-mm-ddThh:mm': "time",
 	'Longitude_[deg]':  "lon",
 	'Latitude_[deg]':   "lat",
-	'Pressure_[dbar]':  "press",
+	'Pressure_[dbar]':  "pres",
 	'Depth_[m]':        "depth",
 	# 'QF_Depth_[m]': int,
 	'Temp_[C]':          "temp",
 	# 'QF_Temp_[C]': int,
 	'Salinity_[psu]':   "sal",
 	# 'QF_Salinity_[psu]': int,
-	# 'Source': str,
+	'Source':           "source",
 	# 'DOI': str,
 	# 'WOD-Cruise-ID': str,
 	# 'WOD-Cast-ID': str,
@@ -112,19 +112,26 @@ def _udash_fileparser(filepath: str):
 						pass
 			data[key].append(v)
 
+	# This could be as another function to be fair
 	data = pd.DataFrame(data)
 	data = data.astype(UDASH_COLUMN_TYPE)
 	data.replace(-999, np.nan, inplace=True)
 	data.replace("-999", "", inplace=True)
 	data.rename(columns=rename_col, inplace=True)
-	data["time"] = pd.to_datetime(data["time"])
+	data["time"] = pd.to_datetime(data["time"], errors="coerce")    # This puts NaT for wrong time
+	# print(os.path.basename(filepath), data.time.isnull().sum())
+	data = data[data.time.notnull()]                                # This filters the NaT and drop them
+
+	data.drop(
+		["QF_Depth_[m]", "QF_Temp_[C]", "QF_Salinity_[psu]", "DOI", "WOD-Cruise-ID", "WOD-Cast-ID"],
+		inplace=True
+	)
 	return data
 
 
-def parse_all_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
+def parse_all_udash(files_nbr: None | int = None, ):
 	udash_extracted_dir = get_udash_extracted_dir()
-	if files is None:
-		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
 	if files_nbr is not None:
 		files = files[:files_nbr]
@@ -144,9 +151,11 @@ def parse_all_udash(files: None | list[str] = None, files_nbr: None | int = None
 
 	if filter:
 		# Use the filter method to apply the conditions to each group
-		udash_range = udash.groupby('file').filter(
-			partial(filter_groups, dim=dim, low=low, high=high, min_nobs=min_nobs)
+		udash = udash.groupby('file').filter(
+			partial(filter_groups, dim="pres", low=10.0, high=750.0, min_nobs=2)
 		)
+
+	return udash
 
 
 def filter_groups(group, dim, low, high, min_nobs):
@@ -304,9 +313,11 @@ def preload_itp(**kwargs):
 
 
 def main():
+	pass
+
 	# download_udash(URL)
 	# _extract_udash()
-	load_udash()
+	# load_udash()
 
 
 if __name__ == "__main__":
