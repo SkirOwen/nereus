@@ -63,6 +63,43 @@ def preload() -> str:
 	argos = load_all_argo()
 	logger.info("Argo Loaded")
 
+	for argo_prof in argo:
+		for ds in argo:
+			for iprof in ds.time.size:
+				time = ds.time[iprof]
+				lat = ds.lat[iprof]
+				lon = ds.longitude[iprof]
+
+				if pres[iprof].min() > 10.0 | pres[iprof].max < 750.0:
+					continue
+				print(dropping
+				ds.attr.id
+				profile
+				iprof)
+				ndrop += 1
+
+				nans = (np.isnan(ds.temp) & np.isnan(ds.psal))
+				nans = ~(np.isnan(ds.temp) & np.isnan(ds.psal))
+
+				pres = ds.where(notnans, drop=True)
+				Temp = ds.temp.where(notnans, drop=true)
+
+				new_temp = np.interp(new_pres, pres, temp)
+
+	ds_out = XR.dataset(
+		vars={
+	‘temp’: ((‘pres’), new_temp),
+	’sal’:(etc…),
+	coords = {
+	‘time’:(‘prof’:[time, ]),
+	’pres’: ((‘pres’, pres_new)),
+	}
+	}
+	)
+
+	ds_all.append(ds_out)
+	ds_new = xr.concat(ds_all,’prof’)
+
 
 
 	processed_argo = []
