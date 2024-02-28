@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import os
 import shutil
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pandas as pd
@@ -14,6 +15,13 @@ from nereus import logger
 from nereus.utils.directories import get_argo_dir
 
 URL = "https://data-argo.ifremer.fr"
+
+RENAME_COL = {
+	"PRES": "pres",
+	"PSAL": "sal",
+	"TEMP": "temp",
+	"DOX2_ADJUSTED": "dis_oxy",
+}
 
 
 def extract_argo() -> None:
@@ -42,19 +50,85 @@ def load_all_argo() -> list:
 	return argos
 
 
-def interp_argo(argo: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
-	x_inter = np.arange(10, 760, 10)
-	interp_itp = {
-		"file": argo["file"].values[:len(x_inter)],  # So everything has the same length
-		base_dim: x_inter
-	}
+# def interp_argo(argo: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+# 	x_inter = np.arange(10, 760, 10)
+#
+# 	# time = argo.time[i].data
+# 	# lat = argo.lat[i].data
+# 	# lon = argo.longitude[i].data
+#
+# 	interp_udash = {
+# 		"profile":  np.full(x_inter.shape, argo["profile"].values[0]),  # So everything has the same length
+# 		"cruise":   np.full(x_inter.shape, argo["cruise"].values[0]),
+# 		"time":     np.full(x_inter.shape, argo.TIME.values[0]),
+# 		"lat":      np.full(x_inter.shape, argo.["lat"].values[0]),
+# 		"lon":      np.full(x_inter.shape, argo.["lon"].values[0]),
+# 		"source":   np.full(x_inter.shape, argo.["source"].values[0]),
+# 		base_dim:   x_inter
+# 	}
+#
+# 	for dim in dims:
+# 		if dim in argo:
+# 			argo[dim] = np.interp(x_inter, argo[base_dim].values, argo[dim].values)
+# 		else:
+# 			argo[dim] = np.full(x_inter.shape, np.nan)
+# 	return pd.DataFrame(argo)
 
-	for dim in dims:
-		if dim in argo:
-			interp_itp[dim] = np.interp(x_inter, argo[base_dim].values, argo[dim].values)
-		else:
-			interp_itp[dim] = np.full(x_inter.shape, np.nan)
-	return pd.DataFrame(interp_itp)
+
+# def clean_argo(argo: xr.Dataset):
+# 	argo = argo.drop_dims("POSITION")
+# 	argo = argo.drop_vars(
+# 		[
+# 			"TIME_QC",
+# 			"DC_REFERENCE",
+# 			"DIRECTION",
+# 			"VERTICAL_SAMPLING_SCHEME",
+# 			"PRES_QC",
+# 			"PRES_ADJUSTED",
+# 			"PRES_ADJUSTED_QC",
+# 			"TEMP_QC",
+# 			"TEMP_ADJUSTED",
+# 			"TEMP_ADJUSTED_QC",
+# 			"PSAL_QC",
+# 			"PSAL_ADJUSTED",
+# 			"PSAL_ADJUSTED_QC",
+# 		]
+# 	)
+
+
+def process_argo(argo, 	x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=["TEMP", "PSAL", "DOX2_ADJUSTED"]):
+	processed = []
+
+	for i in range(argo.TIME.size):
+		if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
+			continue
+
+		interp_argo = {
+			"time": np.full(x_inter.shape, argo.TIME[i].data),
+			"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
+			"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
+			"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
+			base_dim: x_inter
+		}
+
+		for dim in dims:
+			if dim in argo:
+				interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
+			else:
+				interp_argo[dim] = np.full(x_inter.shape, np.nan)
+		processed.append(pd.DataFrame(interp_argo))
+
+	return processed
+
+
+def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
+	unique_coords = argos.drop_duplicates('profile').set_index('profile')[['lat', 'lon', 'time']]
+	argos.set_index(["profile", "pres"], inplace=True)
+
+	ds = xr.Dataset.from_dataframe(argos)
+	for coord in ['lat', 'lon', 'time']:
+		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	return ds
 
 
 def preload() -> str:
@@ -62,71 +136,102 @@ def preload() -> str:
 	# parse
 	argos = load_all_argo()
 	logger.info("Argo Loaded")
-
-	for argo_prof in argo:
-		for ds in argo:
-			for iprof in ds.time.size:
-				time = ds.time[iprof]
-				lat = ds.lat[iprof]
-				lon = ds.longitude[iprof]
-
-				if pres[iprof].min() > 10.0 | pres[iprof].max < 750.0:
-					continue
-				print(dropping
-				ds.attr.id
-				profile
-				iprof)
-				ndrop += 1
-
-				nans = (np.isnan(ds.temp) & np.isnan(ds.psal))
-				nans = ~(np.isnan(ds.temp) & np.isnan(ds.psal))
-
-				pres = ds.where(notnans, drop=True)
-				Temp = ds.temp.where(notnans, drop=true)
-
-				new_temp = np.interp(new_pres, pres, temp)
-
-	ds_out = XR.dataset(
-		vars={
-	‘temp’: ((‘pres’), new_temp),
-	’sal’:(etc…),
-	coords = {
-	‘time’:(‘prof’:[time, ]),
-	’pres’: ((‘pres’, pres_new)),
-	}
-	}
-	)
-
-	ds_all.append(ds_out)
-	ds_new = xr.concat(ds_all,’prof’)
-
-
-
 	processed_argo = []
 
-	for itp in tqdm(argos):
-		new_itp = interp_argo(itp, **kwargs)
-		processed_argo.append(new_itp)
+	x_inter = np.arange(10, 760, 10)
+	base_dim = "PRES"
+	dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
+
+	with ProcessPoolExecutor(6) as executor:
+		results = executor.map(process_argo, argos)
+		for result in results:
+			processed_argo.extend(result)
+
+	# for argo in tqdm(argos):
+	# 	for i in range(argo.TIME.size):
+	# 		if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
+	# 			continue
+	#
+	# 		interp_argo = {
+	# 			"time": np.full(x_inter.shape, argo.TIME[i].data),
+	# 			"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
+	# 			"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
+	# 			"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
+	# 			base_dim: x_inter
+	# 		}
+	#
+	# 		for dim in dims:
+	# 			if dim in argo:
+	# 				interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
+	# 			else:
+	# 				interp_argo[dim] = np.full(x_inter.shape, np.nan)
+	# 		processed_argo.append(pd.DataFrame(interp_argo))
 
 	logger.info("Concat")
-	df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+	argos = pd.concat(processed_argo, ignore_index=True)
 
-	logger.info("Join")
-	df_itps = df_itps.join(metadatas, on="file")
-
-	# df_itps.rename(columns=rename_col, inplace=True)
+	logger.info("Rename")
+	argos.rename(columns=RENAME_COL, inplace=True)
 
 	logger.info("Caching")
-	df_itps.to_parquet(os.path.join(get_argo_dir(), "argo_preprocessed.parquet"))
+	argos.to_parquet(os.path.join(get_argo_dir(), "argos_preprocessed.parquet"))
 
-	# TODO: To xarray
-	# itps_to_xr(df_itps)
-	# save
-	return df_itps
+	logger.info("Converting to xarray")
+	ds = argos_to_xr(argos)
+
+	logger.info("Saving xr")
+	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
+	ds.to_netcdf(
+		save_path,
+		format="NETCDF4",
+		engine="h5netcdf",
+	)
+
+	return save_path
+
+	# 			nans = (np.isnan(ds.temp) & np.isnan(ds.psal))
+	# 			nans = ~(np.isnan(ds.temp) & np.isnan(ds.psal))
+	#
+	# 			pres = ds.where(notnans, drop=True)
+	# 			Temp = ds.temp.where(notnans, drop=true)
+	#
+	# 			new_temp = np.interp(new_pres, pres, temp)
+	#
+	# ds_out = XR.dataset(
+	# 	vars={
+	# ‘temp’: ((‘pres’), new_temp),
+	# ’sal’:(etc…),
+	# coords = {
+	# ‘time’:(‘prof’:[time, ]),
+	# ’pres’: ((‘pres’, pres_new)),
+	# }
+	# }
+	# )
+	#
+	# ds_all.append(ds_out)
+	# ds_new = xr.concat(ds_all,’prof’)
+	#
+
+	#
+	# logger.info("Concat")
+	# df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+	#
+	# logger.info("Join")
+	# df_itps = df_itps.join(metadatas, on="file")
+	#
+	# # df_itps.rename(columns=rename_col, inplace=True)
+	#
+	# logger.info("Caching")
+	# df_itps.to_parquet(os.path.join(get_argo_dir(), "argo_preprocessed.parquet"))
+	#
+	# # TODO: To xarray
+	# # itps_to_xr(df_itps)
+	# # save
+
 
 
 def main():
-	extract_argo()
+	preload()
 
 
 if __name__ == "__main__":
