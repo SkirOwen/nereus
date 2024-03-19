@@ -359,7 +359,7 @@ def itp_parser(
 	return pd.DataFrame(data), metadata
 
 
-def parser_all_itp(limit: int = None) -> tuple:
+def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
@@ -374,7 +374,7 @@ def parser_all_itp(limit: int = None) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for results in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
+		for results in tqdm(pool.imap(itp_parser, files, **kwargs), total=len(files), desc="Parsing itps"):
 			if results is not None:
 				data, metadata = results
 				itps.append(data)
@@ -457,11 +457,12 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
 	unique_coords = df_itps.drop_duplicates('file').set_index('file')[['lat', 'lon', 'time']]
-	df_itps.set_index(["file", "pres"], inplace=True)
+	df_itps.rename(columns={"file": "profile"}, inplace=True)
+	df_itps.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(df_itps)
 	for coord in ['lat', 'lon', 'time']:
-		ds = ds.assign_coords({coord: ('file', unique_coords[coord])})
+		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
 	return ds
 
 
@@ -514,13 +515,6 @@ def main():
 		x_inter=None
 	)
 	print(itps_path)
-
-	# download_itp(override=True)
-	# parser_all_itp_xr()
-	# load_all_itp_xr()
-
-
-# itps_to_df()
 
 
 if __name__ == "__main__":

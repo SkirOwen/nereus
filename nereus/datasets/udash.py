@@ -182,9 +182,6 @@ def parse_all_udash(files_nbr: None | int = None) -> pd.DataFrame:
 		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
 			udash.append(data)
 			gc.collect()
-	# for f in tqdm(files, desc="UDASH files parsing"):
-	# 	df = _udash_fileparser(f)
-	# 	udash.append(df)
 
 	udash = pd.concat(udash, ignore_index=True)
 
@@ -198,100 +195,6 @@ def filter_groups(group, dim, low, high, min_nobs):
 		len(group[dim]) > min_nobs
 	)
 	return mask
-
-
-# def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
-# 	udash_extracted_dir = get_udash_extracted_dir()
-# 	if files is None:
-# 		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
-#
-# 	if files_nbr is not None:
-# 		files = files[:files_nbr]
-#
-# 	logger.info(f"{len(files)} udash files to parse.")
-#
-# 	udash = []
-# 	for f in track(files, description="UDASH files parsing"):
-# 		dd = _udash_fileparser(f)
-# 		udash.append(pl.DataFrame(dd))
-# 		# print(pd.DataFrame(dd).info())
-#
-# 	# with Pool() as pool:
-# 	# 	for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
-# 	# 		udash.append(pl.DataFrame(data))
-# 	logger.info("Merging dataframe")
-# 	df = pl.concat(udash, how="diagonal")
-# 	df = convert_type(df)
-#
-# 	if cache == "parqet":
-# 		df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
-# 	# if cache == "xarray":
-# 	# 	df = udash_xr(df, save=True)
-# 	return df
-
-
-# def convert_type(df: pl.DataFrame) -> pd.DataFrame:
-# 	col = df.columns
-# 	# TODO: can just hard-code the column I want to change, instead of getting the column from the df
-# 	# Though, what if one column does not exist, it would return an error
-# 	# now still the same issue but it just assumed it is matching with UDASH_COLUMN_TYPE
-# 	for c, c_type in zip(col, UDASH_COLUMN_TYPE.values()):
-# 		print(c_type)
-# 		if c != "yyyy-mm-ddThh:mm":
-# 			df = df.with_columns(pl.col(c).cast(c_type))
-# 	return df
-
-
-# def udash_xr(df: pd.DataFrame, save: bool = True) -> xr.Dataset:
-# 	logger.info("Converting to xarray")
-# 	ds = xr.Dataset.from_dataframe(df)
-# 	ds = ds.rename({
-# 		"yyyy-mm-ddThh:mm": "time",
-# 		"Longitude_[deg]": "lon",
-# 		"Latitude_[deg]": "lat",
-# 	})
-# 	ds = ds.set_coords("time")
-# 	ds = ds.swap_dims({"index": "time"})
-# 	ds = ds.drop_vars("index")
-# 	ds = ds.set_coords(["lon", "lat"])
-# 	logger.info("Converted!")
-# 	if save:
-# 		logger.info("Caching")
-# 		ds.to_netcdf(os.path.join(get_udash_dir(), "udash.nc"))
-# 	return ds
-
-
-# def load_udash(
-# 		cache: str = "xarray",
-# 		drop_argo: bool = False,
-# 		drop_itp: bool = False,
-# 		regenerate: bool = False,
-# 		file: str | None = "udash_no_itp_argo.nc",
-# 	) -> pd.DataFrame | xr.Dataset:
-#
-# 	file_ext = "nc" if cache == "xarray" else "parquet"
-# 	file = f"udash.{file_ext}" if file is None else file
-#
-# 	udash_filepath = os.path.join(get_udash_dir(), file)
-# 	udash_parquet_filepath = os.path.join(get_udash_dir(), "udash.parquet")
-# 	xr_flag = False
-#
-# 	if regenerate or not os.path.exists(udash_filepath):
-# 		if os.path.exists(udash_parquet_filepath):
-# 			udash = udash_xr(pd.read_parquet(udash_parquet_filepath))
-# 			xr_flag = True
-# 		else:
-# 			parse_udash(cache=cache)
-#
-# 	if cache == "xarray" and not xr_flag:
-# 		udash = xr.open_dataset(udash_filepath)
-# 		if drop_itp:
-# 			udash = udash.where(np.logical_not(udash.Cruise.str.contains("itp")))
-# 		if drop_argo:
-# 			udash = udash.where(udash.Source != "argo", drop=True)
-# 	if cache == "parquet":
-# 		udash = pd.read_parquet(udash_filepath)
-# 	return udash
 
 
 def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
