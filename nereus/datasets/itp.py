@@ -469,41 +469,43 @@ def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
 def preload_itp(clean_df=True, **kwargs):
 	# check download
 	# parse
-	if not os.path.exists(os.path.join(get_itp_dir(), "itps_preprocessed.parquet")):
-		itps, metadatas = parser_all_itp()
-		logger.info("Parsed")
-		processed_itps = []
-
-		for itp in tqdm(itps):
-			new_itp = interp_itps(itp, **kwargs)
-			processed_itps.append(new_itp)
-
-		logger.info("Concat")
-		df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
-
-		logger.info("Join")
-		df_itps = df_itps.join(metadatas, on="file")
-
-		df_itps.rename(columns=rename_col, inplace=True)
-		if clean_df:
-			logger.info("Clean df")
-			df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
-
-		logger.info("Caching")
-		df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
-	else:
-		df_itps = pd.read_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
-
-	logger.info("Converting to xarray")
-	ds = itps_to_xr(df_itps)
-
-	logger.info("Saving xr")
 	save_path = os.path.join(get_itp_cache_dir(), "itps_xr.nc")
-	ds.to_netcdf(
-		save_path,
-		format="NETCDF4",
-		engine="h5netcdf",
-	)
+	if not os.path.exists(save_path):
+		if not os.path.exists(os.path.join(get_itp_dir(), "itps_preprocessed.parquet")):
+			itps, metadatas = parser_all_itp()
+			logger.info("Parsed")
+			processed_itps = []
+
+			for itp in tqdm(itps):
+				new_itp = interp_itps(itp, **kwargs)
+				processed_itps.append(new_itp)
+
+			logger.info("Concat")
+			df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+
+			logger.info("Join")
+			df_itps = df_itps.join(metadatas, on="file")
+
+			df_itps.rename(columns=rename_col, inplace=True)
+			if clean_df:
+				logger.info("Clean df")
+				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
+
+			logger.info("Caching")
+			df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+		else:
+			df_itps = pd.read_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+
+		logger.info("Converting to xarray")
+		ds = itps_to_xr(df_itps)
+
+		logger.info("Saving xr")
+
+		ds.to_netcdf(
+			save_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
 
 	return save_path
 

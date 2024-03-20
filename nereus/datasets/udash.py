@@ -242,37 +242,39 @@ def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
 def preload_udash(**kwargs) -> str:
 	# check download
 	# parse
-	if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
-		udash = parse_all_udash()
-		udash.rename(columns=rename_col, inplace=True)
-		logger.info("Parsed")
-		processed_udash = []
-
-		for i, u in tqdm(udash.groupby("profile")):
-			new_u = interp_udash(u, **kwargs)
-			processed_udash.append(new_u)
-
-		logger.info("Concat")
-		udash = pd.concat(processed_udash, ignore_index=True)
-
-		udash = udash[udash.time.notnull()]
-		udash.reset_index(inplace=True)
-
-		logger.info("Caching")
-		udash.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
-	else:
-		udash = pd.read_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
-
-	logger.info("Converting to xarray")
-	ds = udash_to_xr(udash)
-
-	logger.info("Saving xr")
 	save_path = os.path.join(get_udash_dir(), "udash_xr.nc")
-	ds.to_netcdf(
-		save_path,
-		format="NETCDF4",
-		engine="h5netcdf",
-	)
+	if not os.path.exists(save_path):
+		if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
+			udash = parse_all_udash()
+			udash.rename(columns=rename_col, inplace=True)
+			logger.info("Parsed")
+			processed_udash = []
+
+			for i, u in tqdm(udash.groupby("profile")):
+				new_u = interp_udash(u, **kwargs)
+				processed_udash.append(new_u)
+
+			logger.info("Concat")
+			udash = pd.concat(processed_udash, ignore_index=True)
+
+			udash = udash[udash.time.notnull()]
+			udash.reset_index(inplace=True)
+
+			logger.info("Caching")
+			udash.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+		else:
+			udash = pd.read_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+
+		logger.info("Converting to xarray")
+		ds = udash_to_xr(udash)
+
+		logger.info("Saving xr")
+
+		ds.to_netcdf(
+			save_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
 	return save_path
 
 

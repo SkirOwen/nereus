@@ -134,58 +134,62 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 def preload_argo(**kwargs) -> str:
 	# check download
 	# parse
-	argos = load_all_argo()
-	logger.info("Argo Loaded")
-	processed_argo = []
 
-	x_inter = np.arange(10, 760, 10)
-	base_dim = "PRES"
-	dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
-
-	# with ProcessPoolExecutor(6) as executor:
-	# 	results = executor.map(process_argo, argos)
-	# 	for result in tqdm(results, total=len(argos)):
-	# 		processed_argo.extend(result)
-
-	for argo in tqdm(argos):
-		for i in range(argo.TIME.size):
-			if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
-				continue
-
-			interp_argo = {
-				"time": np.full(x_inter.shape, argo.TIME[i].data),
-				"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
-				"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
-				"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
-				base_dim: x_inter
-			}
-
-			for dim in dims:
-				if dim in argo:
-					interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
-				else:
-					interp_argo[dim] = np.full(x_inter.shape, np.nan)
-			processed_argo.append(pd.DataFrame(interp_argo))
-
-	logger.info("Concat")
-	argos = pd.concat(processed_argo, ignore_index=True)
-
-	logger.info("Rename")
-	argos.rename(columns=RENAME_COL, inplace=True)
-
-	logger.info("Caching")
-	argos.to_parquet(os.path.join(get_argo_dir(), "argos_preprocessed.parquet"))
-
-	logger.info("Converting to xarray")
-	ds = argos_to_xr(argos)
-
-	logger.info("Saving xr")
 	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
-	ds.to_netcdf(
-		save_path,
-		format="NETCDF4",
-		engine="h5netcdf",
-	)
+
+	if not os.path.exists(save_path):
+		argos = load_all_argo()
+		logger.info("Argo Loaded")
+		processed_argo = []
+
+		x_inter = np.arange(10, 760, 10)
+		base_dim = "PRES"
+		dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
+
+		# with ProcessPoolExecutor(6) as executor:
+		# 	results = executor.map(process_argo, argos)
+		# 	for result in tqdm(results, total=len(argos)):
+		# 		processed_argo.extend(result)
+
+		for argo in tqdm(argos):
+			for i in range(argo.TIME.size):
+				if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
+					continue
+
+				interp_argo = {
+					"time": np.full(x_inter.shape, argo.TIME[i].data),
+					"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
+					"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
+					"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
+					base_dim: x_inter
+				}
+
+				for dim in dims:
+					if dim in argo:
+						interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
+					else:
+						interp_argo[dim] = np.full(x_inter.shape, np.nan)
+				processed_argo.append(pd.DataFrame(interp_argo))
+
+		logger.info("Concat")
+		argos = pd.concat(processed_argo, ignore_index=True)
+
+		logger.info("Rename")
+		argos.rename(columns=RENAME_COL, inplace=True)
+
+		logger.info("Caching")
+		argos.to_parquet(os.path.join(get_argo_dir(), "argos_preprocessed.parquet"))
+
+		logger.info("Converting to xarray")
+		ds = argos_to_xr(argos)
+
+		logger.info("Saving xr")
+
+		ds.to_netcdf(
+			save_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
 
 	return save_path
 
