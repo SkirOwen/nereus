@@ -2,17 +2,11 @@ from __future__ import annotations
 
 import os
 
-import pandas as pd
-import numpy as np
 import xarray as xr
 
 from nereus.datasets.itp import preload_itp
 from nereus.datasets.argo import preload_argo
 from nereus.datasets.udash import preload_udash
-
-
-def df_merge_quick(itps: tuple, udash: pd.DataFrame, argo: list[xr.Dataset]) -> pd.DataFrame:
-	pass
 
 
 def format_merged(ds, **kwargs) -> xr.Dataset:
@@ -30,10 +24,9 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 
 	ds = format_merged(ds)
 
-	if kwargs["save"]:
-		cache_path = ""
-		ds.to_netcdf(cache_path)
-
+	# if kwargs["save"]:
+	# 	cache_path = ""
+	# 	ds.to_netcdf(cache_path)
 	return ds
 
 
@@ -47,7 +40,7 @@ def load(**kwargs) -> xr.Dataset:
 
 
 def main():
-	pass
+	load()
 
 
 if __name__ == "__main__":
