@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import datetime
 import os
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
@@ -11,6 +13,8 @@ import seaborn as sns
 import cmocean as cm
 import cartopy.crs as ccrs
 import xarray as xr
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from rich.console import Console
 
@@ -19,9 +23,13 @@ from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
 
-def get_arctic_map():
-	fig = plt.figure(figsize=(10, 10), dpi=300)
-	ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+def get_arctic_map(ax=None) -> tuple[Figure, None] | Axes:
+	if ax is None:
+		fig = plt.figure(figsize=(10, 10), dpi=300)
+		ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+		ax_created = True
+	else:
+		ax_created = False
 	ax.set_extent([-180, 180, 90, 55], ccrs.PlateCarree())
 	theta = np.linspace(0, 2 * np.pi, 100)
 	center, radius = [0.5, 0.5], 0.5
@@ -29,7 +37,32 @@ def get_arctic_map():
 	circle = mpath.Path(verts * radius + center)
 	ax.coastlines()
 	ax.set_boundary(circle, transform=ax.transAxes)
-	return fig, ax
+	if ax_created:
+		return fig, ax
+	else:
+		return ax
+
+
+def map_arctic_value(df, name=None, **snskwargs):
+	fig, ax = get_arctic_map()
+
+	logger.info("Scatter plot, takes some time")
+	with Console().status("Loading") as st:
+		g = sns.scatterplot(
+			data=df,
+			x="lon",
+			y="lat",
+			s=1,
+			ax=ax,
+			transform=ccrs.PlateCarree(),
+			markers="h",
+			**snskwargs
+		)
+	logger.info("Saving")
+	plt.savefig(os.path.join(get_plot_dir(), f"map_{name}.png"))
+	logger.info("Done")
+	logger.info("Showing")
+	plt.show()
 
 
 def map_itps(itps_metadata):
