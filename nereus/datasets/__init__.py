@@ -1,1 +1,1 @@
-from .merged import load
+from .merged import load_data

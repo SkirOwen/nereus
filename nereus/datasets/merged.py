@@ -30,7 +30,7 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 	return ds
 
 
-def load(**kwargs) -> xr.Dataset:
+def load_data(**kwargs) -> xr.Dataset:
 	cache_file = ""
 	if os.path.exists(cache_file):
 		ds = xr.open_dataset(cache_file)
@@ -40,7 +40,7 @@ def load(**kwargs) -> xr.Dataset:
 
 
 def main():
-	load()
+	load_data()
 
 
 if __name__ == "__main__":
