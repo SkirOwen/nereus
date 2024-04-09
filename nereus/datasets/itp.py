@@ -472,7 +472,7 @@ def preload_itp(clean_df=True, **kwargs):
 	save_path = os.path.join(get_itp_cache_dir(), "itps_xr.nc")
 	if not os.path.exists(save_path):
 		if not os.path.exists(os.path.join(get_itp_dir(), "itps_preprocessed.parquet")):
-			itps, metadatas = parser_all_itp()
+			itps, metadatas = parser_all_itp(**kwargs)
 			logger.info("Parsed")
 			processed_itps = []
 
