@@ -11,7 +11,6 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
-import polars as pl
 import xarray as xr
 from tqdm import tqdm
 from rich.progress import track
