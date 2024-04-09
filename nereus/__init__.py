@@ -2,7 +2,16 @@ import logging
 
 from .logger import make_logger
 
-__all__ = ["logger"]
+from .datasets import *
+from .utils.directories import *
+
+
+__all__ = [
+	"logger",
+	"cluster",
+	"plots",
+	"processing"
+]
 
 logger: logging.Logger
 
