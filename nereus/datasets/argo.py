@@ -153,10 +153,13 @@ def preload_argo(**kwargs) -> str:
 
 		for argo in tqdm(argos):
 			for i in range(argo.TIME.size):
+				if np.all(np.diff(argo.PRES[i]) > 0):   # Making sure no NaNs in the pressure and strictly increasing
+					continue
 				if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
 					continue
 
 				interp_argo = {
+
 					"time": np.full(x_inter.shape, argo.TIME[i].data),
 					"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
 					"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
