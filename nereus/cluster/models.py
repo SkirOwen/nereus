@@ -163,11 +163,36 @@ def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
 	data_full = nereus.load_data().load()
-	ds_full = data_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds = data_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds = ds.where(~(ds.temp > 25), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	ds.where(np.logical_and(ds.sal > 25, ds.sal < 27), drop=True).sel(pres=slice(350, None), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	drop_ds = ds.sel(pres=slice(350, None)).where(
+		np.logical_and(
+			ds.sel(pres=slice(350, None)).sal > 25,
+			ds.sel(pres=slice(350, None)).sal < 27
+		), drop=True
+	)
+	ds = ds.drop_sel(profile=drop_ds.profile, errors="ignore")
+	ds_full = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+
 
 	logger.info("Loading train data")
 	data = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
 	ds = data.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds = ds.where(~(ds.temp > 25), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	ds.where(np.logical_and(ds.sal > 25, ds.sal < 27), drop=True).sel(pres=slice(350, None), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	drop_ds = ds.sel(pres=slice(350, None)).where(
+		np.logical_and(
+			ds.sel(pres=slice(350, None)).sal > 25,
+			ds.sel(pres=slice(350, None)).sal < 27
+		), drop=True
+	)
+	ds = ds.drop_sel(profile=drop_ds.profile)
+	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
 
 	scaler_temp = get_scaler(ds_full["temp"].values)
 	scaler_sal = get_scaler(ds_full["sal"].values)
