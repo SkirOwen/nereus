@@ -23,9 +23,14 @@ from nereus.datasets import load_data
 from nereus.utils.directories import get_data_dir
 
 
-def pca_score(value, n_pc: int):
+def get_scaler(value):
 	scaler = StandardScaler()
-	scaled_value = scaler.fit_transform(value)
+	scaler = scaler.fit(value)
+	return scaler
+
+
+def pca_score(value, n_pc: int, scaler):
+	scaled_value = scaler.transform(value)
 
 	pca_model = PCA(n_components=n_pc)
 	fitted_value = pca_model.fit(scaled_value)
@@ -139,14 +144,14 @@ def gmm(temp_sal_score_full, temp_sal_score_train, n_components: int = 4):
 	return transformed_data, model
 
 
-def get_temp_sal_score(ds, n_pc):
+def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
 	temp = ds["temp"].values
 	sal = ds["sal"].values
 
 	logger.info("PCA score")
 
-	score_temp, comp_temp, exp_var_temp = pca_score(temp, n_pc=n_pc)
-	score_sal, comp_sal, exp_var_sal = pca_score(sal, n_pc=n_pc)
+	score_temp, comp_temp, exp_var_temp = pca_score(temp, n_pc=n_pc, scaler=scaler_temp)
+	score_sal, comp_sal, exp_var_sal = pca_score(sal, n_pc=n_pc, scaler=scaler_sal)
 
 	comps = np.array([comp_temp, comp_sal])
 	exp_vars = np.array([exp_var_temp, exp_var_sal])
@@ -164,8 +169,11 @@ def run(benchmark, n_pc, n_gmm):
 	data = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
 	ds = data.dropna(dim="profile", subset=["temp", "sal"], how="any")
 
-	comps, exp_vars, temp_sal_score = get_temp_sal_score(ds, n_pc)
-	comps_full, exp_vars_full, temp_sal_score_full = get_temp_sal_score(ds_full, n_pc)
+	scaler_temp = get_scaler(ds_full["temp"].values)
+	scaler_sal = get_scaler(ds_full["sal"].values)
+
+	comps, exp_vars, temp_sal_score = get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal)
+	comps_full, exp_vars_full, temp_sal_score_full = get_temp_sal_score(ds_full, n_pc, scaler_temp, scaler_sal)
 
 	logger.info("Plot PCA")
 	plot_pca_score(ds, comps, exp_vars, n_pc, titles=["temp_train", "sal_train"])
@@ -184,8 +192,8 @@ def run(benchmark, n_pc, n_gmm):
 
 
 def main():
-	n_pc = 3
-	n_gmm = 4
+	n_pc = 2
+	n_gmm = 7
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
 	map_arctic_value(
 		ds_full.to_dataframe(),
