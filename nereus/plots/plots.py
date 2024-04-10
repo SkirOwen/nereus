@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import datetime
 import os
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.path as mpath
@@ -11,18 +13,23 @@ import seaborn as sns
 import cmocean as cm
 import cartopy.crs as ccrs
 import xarray as xr
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from rich.console import Console
 
+import nereus.datasets.merged
 from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
-from nereus.datasets import load_udash, load_itp
 
-
-def get_arctic_map():
-	fig = plt.figure(figsize=(10, 10), dpi=300)
-	ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+def get_arctic_map(ax=None) -> tuple[Figure, None] | Axes:
+	if ax is None:
+		fig = plt.figure(figsize=(10, 10), dpi=300)
+		ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
+		ax_created = True
+	else:
+		ax_created = False
 	ax.set_extent([-180, 180, 90, 55], ccrs.PlateCarree())
 	theta = np.linspace(0, 2 * np.pi, 100)
 	center, radius = [0.5, 0.5], 0.5
@@ -30,7 +37,32 @@ def get_arctic_map():
 	circle = mpath.Path(verts * radius + center)
 	ax.coastlines()
 	ax.set_boundary(circle, transform=ax.transAxes)
-	return fig, ax
+	if ax_created:
+		return fig, ax
+	else:
+		return ax
+
+
+def map_arctic_value(df, name=None, **snskwargs):
+	fig, ax = get_arctic_map()
+
+	logger.info("Scatter plot, takes some time")
+	with Console().status("Loading") as st:
+		g = sns.scatterplot(
+			data=df,
+			x="lon",
+			y="lat",
+			s=1,
+			ax=ax,
+			transform=ccrs.PlateCarree(),
+			markers="h",
+			**snskwargs
+		)
+	logger.info("Saving")
+	plt.savefig(os.path.join(get_plot_dir(), f"map_{name}.png"))
+	logger.info("Done")
+	logger.info("Showing")
+	plt.show()
 
 
 def map_itps(itps_metadata):
@@ -266,18 +298,57 @@ def t_s(itp, udash, argos):
 	plt.show()
 
 
+def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False) -> None:
+	import matplotlib.ticker as mticker
+	from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
+	import cmocean as cm
+
+	if decade:
+		decades = [("pre-2005", data.time.dt.year < 2005), ("post-2005", data.time.dt.year >= 2005)]
+	else:
+		decades = [("all", data)]
+
+	for dec_name, dec in decades:
+		for i, data_seas in enumerate(data.groupby(dec.time.dt.season)):
+			fig, ax = get_arctic_map()
+			gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+
+
+			# Create the 2D histogram using hexbin
+			hb = ax.hexbin(
+				x=data_seas[1]['lon'],
+				y=data_seas[1]['lat'],
+				# C=data["temp"].values,
+				gridsize=(80),  # Adjust the gridsize to your preference
+				cmap=cm.cm.dense,  # Choose the colormap you prefer
+				transform=ccrs.PlateCarree(),
+				bins='log'
+			)
+
+			# Add colorbar
+			cbar = plt.colorbar(hb, ax=ax, orientation='vertical', pad=0.05, label='Number of data points')
+
+			# Make colorbar height same as plot
+			ax_size = ax.get_position()
+			cbar.ax.set_position([ax_size.x1 + 0.1, ax_size.y0, 0.03, ax_size.height])
+
+			# Adjust longitude and latitude labels
+			gl.xlocator = mticker.FixedLocator(np.concatenate([np.arange(-180, 180, 20), np.arange(-180, 180, 20)]))
+			gl.xformatter = LONGITUDE_FORMATTER
+			gl.xlabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
+			gl.yformatter = LATITUDE_FORMATTER
+			gl.ylocator = mticker.FixedLocator(np.arange(65, 90, 5), 200)
+			gl.ylabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
+
+			plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_s{data_seas[0]}_d{dec_name}.png"), dpi=1000)
+			plt.show()
+
 
 def main():
-	udash = load_udash()
-	# map_udash(udash)
-	udash_depth_hist(udash)
-	# udash_months_hist(udash)
-	# udash_time_hist(udash)
-	# fig, ax = get_arctic_map()
-	# plt.show()
-	itps, metadata = load_itp()
-	map_itps(metadata)
-	# time_hist(metadata)
+	ds = nereus.datasets.merged.load()
+
+	spatial_density(ds, season=True)
+	spatial_density(ds, season=True, decade=True)
 
 
 if __name__ == "__main__":

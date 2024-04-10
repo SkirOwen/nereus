@@ -65,8 +65,8 @@ rename_col = {
 	'dissolved_oxygen(umol/kg)': "dis_oxy",
 	# 'turbidity(e-4)',
 	# 'chlorophyll_a(ug/l)',
-	'longitude(E+)': "lon",
-	'latitude(N+)': "lat",
+	'longitude(e+)': "lon",
+	'latitude(n+)': "lat",
 	# 'ndepths',
 	# 'time'
 }
@@ -359,7 +359,7 @@ def itp_parser(
 	return pd.DataFrame(data), metadata
 
 
-def parser_all_itp(limit: int = None) -> tuple:
+def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	all_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*.dat"))
 	micro_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*micro*.dat"))
 	sami_files = glob.glob(os.path.join(get_itp_extracted_dir(), "*sami*.dat"))
@@ -374,7 +374,7 @@ def parser_all_itp(limit: int = None) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for results in tqdm(pool.imap(itp_parser, files), total=len(files), desc="Parsing itps"):
+		for results in tqdm(pool.imap(itp_parser, files, **kwargs), total=len(files), desc="Parsing itps"):
 			if results is not None:
 				data, metadata = results
 				itps.append(data)
@@ -455,42 +455,68 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 	return pd.DataFrame(interp_itp)
 
 
-def preload_itp(**kwargs):
+def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
+	unique_coords = df_itps.drop_duplicates('file').set_index('file')[['lat', 'lon', 'time']]
+	df_itps.rename(columns={"file": "profile"}, inplace=True)
+	df_itps.set_index(["profile", "pres"], inplace=True)
+
+	ds = xr.Dataset.from_dataframe(df_itps)
+	for coord in ['lat', 'lon', 'time']:
+		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	return ds
+
+
+def preload_itp(clean_df=True, **kwargs):
 	# check download
 	# parse
-	itps, metadatas = parser_all_itp()
-	logger.info("Parsed")
-	processed_itps = []
+	save_path = os.path.join(get_itp_cache_dir(), "itps_xr.nc")
+	if not os.path.exists(save_path):
+		if not os.path.exists(os.path.join(get_itp_dir(), "itps_preprocessed.parquet")):
+			itps, metadatas = parser_all_itp(**kwargs)
+			logger.info("Parsed")
+			processed_itps = []
 
-	for itp in tqdm(itps):
-		new_itp = interp_itps(itp, **kwargs)
-		processed_itps.append(new_itp)
+			for itp in tqdm(itps):
+				new_itp = interp_itps(itp, **kwargs)
+				processed_itps.append(new_itp)
 
-	logger.info("Concat")
-	df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+			logger.info("Concat")
+			df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
 
-	logger.info("Join")
-	df_itps = df_itps.join(metadatas, on="file")
+			logger.info("Join")
+			df_itps = df_itps.join(metadatas, on="file")
 
-	df_itps.rename(columns=rename_col, inplace=True)
+			df_itps.rename(columns=rename_col, inplace=True)
+			if clean_df:
+				logger.info("Clean df")
+				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
 
-	logger.info("Caching")
-	df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+			logger.info("Caching")
+			df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+		else:
+			df_itps = pd.read_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
 
-	# TODO: To xarray
-	# itps_to_xr(df_itps)
-	# save
-	return df_itps
+		logger.info("Converting to xarray")
+		ds = itps_to_xr(df_itps)
+
+		logger.info("Saving xr")
+
+		ds.to_netcdf(
+			save_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
+
+	return save_path
 
 
 def main():
-	pass
-	# download_itp(override=True)
-	# parser_all_itp_xr()
-	# load_all_itp_xr()
-
-
-# itps_to_df()
+	itps_path = preload_itp(
+		dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
+		base_dim="pressure(dbar)",
+		x_inter=None
+	)
+	print(itps_path)
 
 
 if __name__ == "__main__":

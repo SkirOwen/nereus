@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import gc
 import glob
 import os
 import shutil
 
 from datetime import datetime, date
+from functools import partial
 from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
-import polars as pl
 import xarray as xr
 from tqdm import tqdm
 from rich.progress import track
@@ -27,20 +28,42 @@ UDASH_COLUMN_TYPE = {
 	'Station': str,
 	'Platform': str,
 	'Type': str,
-	'yyyy-mm-ddThh:mm': datetime,
+	# 'yyyy-mm-ddThh:mm': datetime,
 	'Longitude_[deg]': float,
 	'Latitude_[deg]': float,
 	'Pressure_[dbar]': float,
 	'Depth_[m]': float,
 	'QF_Depth_[m]': int,
-	'Temp[C]': float,
-	'QF_Temp[C]': int,
+	'Temp_[C]': float,
+	'QF_Temp_[C]': int,
 	'Salinity_[psu]': float,
 	'QF_Salinity_[psu]': int,
 	'Source': str,
 	'DOI': str,
 	'WOD-Cruise-ID': str,
 	'WOD-Cast-ID': str,
+}
+
+rename_col = {
+	"Prof_no":          "profile",
+	"Cruise":           "cruise",
+	"Station":          "station",
+	"Platform":         "platform",
+	"Type":             "type",
+	'yyyy-mm-ddThh:mm': "time",
+	'Longitude_[deg]':  "lon",
+	'Latitude_[deg]':   "lat",
+	'Pressure_[dbar]':  "pres",
+	'Depth_[m]':        "depth",
+	# 'QF_Depth_[m]': int,
+	'Temp_[C]':          "temp",
+	# 'QF_Temp_[C]': int,
+	'Salinity_[psu]':   "sal",
+	# 'QF_Salinity_[psu]': int,
+	'Source':           "source",
+	# 'DOI': str,
+	# 'WOD-Cruise-ID': str,
+	# 'WOD-Cast-ID': str,
 }
 
 
@@ -60,7 +83,7 @@ def _extract_udash(file: None | str = None) -> None:
 	)
 
 
-def _udash_fileparser(filepath: str):
+def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True) -> pd.DataFrame:
 	lines = []
 	with open(filepath, "r") as f:
 		for line in f:
@@ -88,13 +111,64 @@ def _udash_fileparser(filepath: str):
 					except ValueError:
 						pass
 			data[key].append(v)
+
+	data = pd.DataFrame(data)
+	# logger.info("Clean")
+	data = clean_df_udash(data)
+
+	# logger.info("argo")
+	if remove_argo:
+		data.query('Source != "argo"', inplace=True)
+	# logger.info("itp")
+	if remove_itp:
+		data.query('not Cruise.str.contains("itp")', inplace=True)
+
+	# logger.info("filter")
+	if filtering:
+		# Use the filter method to apply the conditions to each group
+		data = data.groupby('Prof_no').filter(
+			partial(filter_groups, dim="Pressure_[dbar]", low=10.0, high=750.0, min_nobs=2)
+		)
 	return data
 
 
-def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, cache: str = "xarray"):
+def clean_df_udash(data, col_to_drop: None | list[str] = None) -> pd.DataFrame:
+	col_to_drop = [
+		"Station",
+		"Platform",
+		"Type",
+		"Depth_[m]",
+		"QF_Depth_[m]",
+		"QF_Temp_[C]",
+		"QF_Salinity_[psu]",
+		"DOI",
+		"WOD-Cruise-ID",
+		"WOD-Cast-ID"
+	]
+	data.drop(
+		col_to_drop,
+		axis=1,
+		inplace=True,
+	)
+
+	for c in col_to_drop:
+		if c in UDASH_COLUMN_TYPE:
+			UDASH_COLUMN_TYPE.pop(c)
+
+	data = data.astype(UDASH_COLUMN_TYPE)
+	data.replace({-999: np.nan, "-999": np.nan}, inplace=True)
+	data["yyyy-mm-ddThh:mm"] = pd.to_datetime(data["yyyy-mm-ddThh:mm"], errors="coerce")
+	# data.rename(columns=rename_col, inplace=True)
+	# data["time"] = pd.to_datetime(data["time"], errors="coerce")    # This puts NaT for wrong time
+	# print(os.path.basename(filepath), data.time.isnull().sum())
+	# data = data[data.time.notnull()]                                # This filters the NaT and drop them
+
+	return data
+
+
+def parse_all_udash(files_nbr: None | int = None) -> pd.DataFrame:
 	udash_extracted_dir = get_udash_extracted_dir()
-	if files is None:
-		files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
 	if files_nbr is not None:
 		files = files[:files_nbr]
@@ -102,93 +176,113 @@ def parse_udash(files: None | list[str] = None, files_nbr: None | int = None, ca
 	logger.info(f"{len(files)} udash files to parse.")
 
 	udash = []
-	for f in track(files, description="UDASH files parsing"):
-		dd = _udash_fileparser(f)
-		udash.append(pl.DataFrame(dd))
-		# print(pd.DataFrame(dd).info())
 
-	# with Pool() as pool:
-	# 	for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
-	# 		udash.append(pl.DataFrame(data))
-	logger.info("Merging dataframe")
-	df = pl.concat(udash, how="diagonal")
-	df = convert_type(df)
+	with Pool(6) as pool:
+		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
+			udash.append(data)
+			gc.collect()
 
-	if cache == "parqet":
-		df.write_parquet(os.path.join(get_udash_dir(), "udash.parquet"))
-	if cache == "xarray":
-		df = udash_xr(df, save=True)
-	return df
+	udash = pd.concat(udash, ignore_index=True)
 
-
-def convert_type(df: pl.DataFrame):
-	col = df.columns
-	# TODO: can just hard-code the column I want to change, instead of getting the column from the df
-	# Though, what if one column does not exist, it would return an error
-	# now still the same issue but it just assumed it is matching with UDASH_COLUMN_TYPE
-	for c, c_type in zip(col, UDASH_COLUMN_TYPE.values()):
-		print(c_type)
-		if c != "yyyy-mm-ddThh:mm":
-			df = df.with_columns(pl.col(c).cast(c_type))
-	return df
-
-
-def udash_xr(df: pd.DataFrame, save: bool = True) -> xr.Dataset:
-	logger.info("Converting to xarray")
-	ds = xr.Dataset.from_dataframe(df)
-	ds = ds.rename({
-		"yyyy-mm-ddThh:mm": "time",
-		"Longitude_[deg]": "lon",
-		"Latitude_[deg]": "lat",
-	})
-	ds = ds.set_coords("time")
-	ds = ds.swap_dims({"index": "time"})
-	ds = ds.drop_vars("index")
-	ds = ds.set_coords(["lon", "lat"])
-	logger.info("Converted!")
-	if save:
-		logger.info("Caching")
-		ds.to_netcdf(os.path.join(get_udash_dir(), "udash.nc"))
-	return ds
-
-
-def load_udash(
-		cache: str = "xarray",
-		drop_argo: bool = False,
-		drop_itp: bool = False,
-		regenerate: bool = False,
-		file: str | None = "udash_no_itp_argo.nc",
-	) -> pd.DataFrame | xr.Dataset:
-
-	file_ext = "nc" if cache == "xarray" else "parquet"
-	file = f"udash.{file_ext}" if file is None else file
-
-	udash_filepath = os.path.join(get_udash_dir(), file)
-	udash_parquet_filepath = os.path.join(get_udash_dir(), "udash.parquet")
-	xr_flag = False
-
-	if regenerate or not os.path.exists(udash_filepath):
-		if os.path.exists(udash_parquet_filepath):
-			udash = udash_xr(pd.read_parquet(udash_parquet_filepath))
-			xr_flag = True
-		else:
-			parse_udash(cache=cache)
-
-	if cache == "xarray" and not xr_flag:
-		udash = xr.open_dataset(udash_filepath)
-		if drop_itp:
-			udash = udash.where(np.logical_not(udash.Cruise.str.contains("itp")))
-		if drop_argo:
-			udash = udash.where(udash.Source != "argo", drop=True)
-	if cache == "parquet":
-		udash = pd.read_parquet(udash_filepath)
 	return udash
 
 
+def filter_groups(group, dim, low, high, min_nobs):
+	mask = (
+		group[dim].max() >= high and
+		group[dim].min() <= low and
+		len(group[dim]) > min_nobs
+	)
+	return mask
+
+
+def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+	# This will take dims as y for interpolation
+	# such as dims = f(base_dim)
+	# then take x_inter, a range of point on which to interpolate
+	# it will return?? a dict? a new df?
+	# if it returns a df, should the input be a df?
+	# Handle NaNs
+	# Can remove the nans.
+	# or just quickly to pd interp?
+	# That could be a parameter
+
+	x_inter = np.arange(10, 760, 10)
+	interp_udash = {
+		"profile":  np.full(x_inter.shape, udash["profile"].values[0]),  # So everything has the same length
+		"cruise":   np.full(x_inter.shape, udash["cruise"].values[0]),
+		"time":     np.full(x_inter.shape, udash["time"].values[0]),
+		"lat":      np.full(x_inter.shape, udash["lat"].values[0]),
+		"lon":      np.full(x_inter.shape, udash["lon"].values[0]),
+		"source":   np.full(x_inter.shape, udash["source"].values[0]),
+		base_dim:   x_inter
+	}
+
+	for dim in dims:
+		if dim in udash:
+			interp_udash[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
+		else:
+			interp_udash[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_udash)
+
+
+def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
+	unique_coords = udash.drop_duplicates('profile').set_index('profile')[
+		["lat", "lon", "time", "cruise", "source"]
+	]
+	udash.set_index(["profile", "pres"], inplace=True)
+
+	ds = xr.Dataset.from_dataframe(udash)
+	for coord in ["lat", 'lon', 'time', "cruise", "source"]:
+		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	return ds
+
+
+def preload_udash(**kwargs) -> str:
+	# check download
+	# parse
+	save_path = os.path.join(get_udash_dir(), "udash_xr.nc")
+	if not os.path.exists(save_path):
+		if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
+			udash = parse_all_udash()
+			udash.rename(columns=rename_col, inplace=True)
+			logger.info("Parsed")
+			processed_udash = []
+
+			for i, u in tqdm(udash.groupby("profile")):
+				new_u = interp_udash(u, **kwargs)
+				processed_udash.append(new_u)
+
+			logger.info("Concat")
+			udash = pd.concat(processed_udash, ignore_index=True)
+
+			udash = udash[udash.time.notnull()]
+			udash.reset_index(inplace=True)
+
+			logger.info("Caching")
+			udash.to_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+		else:
+			udash = pd.read_parquet(os.path.join(get_udash_dir(), "udash_preprocessed.parquet"))
+
+		logger.info("Converting to xarray")
+		ds = udash_to_xr(udash)
+
+		logger.info("Saving xr")
+
+		ds.to_netcdf(
+			save_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
+	return save_path
+
+
 def main():
+	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
+
 	# download_udash(URL)
 	# _extract_udash()
-	load_udash()
+	# load_udash()
 
 
 if __name__ == "__main__":

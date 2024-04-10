@@ -1,7 +1,12 @@
 from __future__ import annotations
 
-import os
 import hashlib
+import json
+import os
+
+from nereus.config import get_nereus_dir
+
+CACHE_MAPPING = os.path.join(get_nereus_dir(), "nereus", "cache_mapping")
 
 
 def guarantee_existence(path: str) -> str:
@@ -43,9 +48,23 @@ def calculate_md5(file_path: str) -> str:
 	return hash_md5.hexdigest()
 
 
-def create_cache_filename(name: str, ext: str, *args):
-	combined_args = "_".join(map(str, args))
+def create_cache_filename(name: str, **kwargs) -> str:
+	combined_string = "_".join(f"{key}={value}" for key, value in kwargs.items())
 
-	hash_object = hashlib.md5(combined_args.encode())
+	hash_object = hashlib.md5(combined_string.encode())
 	hash_string = hash_object.hexdigest()
-	return f"name_{hash_string}.{ext}"
+
+	# Save the mapping
+	with open(CACHE_MAPPING, 'a') as file:
+		file.write(json.dumps({hash_string: kwargs}) + "\n")
+
+	return f"name_{hash_string}"
+
+
+def retrieve_processing_info(hash_string) -> str | None:
+	with open(CACHE_MAPPING, 'r') as file:
+		for line in file:
+			mapping = json.loads(line)
+			if hash_string in mapping:
+				return mapping[hash_string]
+	return None
