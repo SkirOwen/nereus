@@ -160,6 +160,61 @@ def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
 	return comps, exp_vars, temp_sal_score
 
 
+def plot_mean_profile_allinone(ds_fit) -> None:
+	"""
+	Plot mean profile for each class in a single figure.
+
+	Args:
+		ds_fit: The input dataset.
+	"""
+
+	unique_labels = np.unique(ds_fit.label.values)
+	num_classes = len(unique_labels)
+
+	fig, axs = plt.subplots(1, 2, figsize=(8, 6), dpi=300)
+	color_list = [
+		'red',
+		'saddlebrown',
+		'deepskyblue',
+		'purple',
+		"darkolivegreen",
+		"orange",
+		"turquoise"
+	]  # Define your own color list
+
+	for i in range(num_classes):
+		ds_class = ds_fit.where(ds_fit.label == i, drop=True)
+
+		qua5_temp = np.quantile(ds_class['temp'], 0.05, axis=0)
+		qua95_temp = np.quantile(ds_class['temp'], 0.95, axis=0)
+		qua50_temp = np.quantile(ds_class['temp'], 0.50, axis=0)
+
+		qua5_salinity = np.quantile(ds_class['sal'], 0.05, axis=0)
+		qua95_salinity = np.quantile(ds_class['sal'], 0.95, axis=0)
+		qua50_salinity = np.quantile(ds_class['sal'], 0.50, axis=0)
+
+		ax = axs[0]
+		ax.plot(qua50_temp, ds_fit['pres'].values, c=color_list[i], label=f'Class {i}')
+		ax.fill_betweenx(ds_fit['pres'].values, qua5_temp, qua95_temp, color=color_list[i], alpha=0.5)
+		ax.legend(loc="upper right")
+		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
+		ax.set_ylabel('Pressure (dbar)')
+		ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
+		ax.set_xlabel('Temperature (°C)')
+
+		ax = axs[1]
+		ax.plot(qua50_salinity, ds_fit['pres'].values, c=color_list[i], label=f'Class {i}')
+		ax.fill_betweenx(ds_fit['pres'].values, qua5_salinity, qua95_salinity, color=color_list[i], alpha=0.5)
+		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
+		# ax.legend(loc='lower left')
+		# ax.set_ylabel('Pressure')
+		ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
+		ax.set_ylabel('')
+		ax.set_xlabel('Salinity (g/kg)')
+
+	plt.show()
+
+
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
 	data_full = nereus.load_data().load()
@@ -176,7 +231,6 @@ def run(benchmark, n_pc, n_gmm):
 	)
 	ds = ds.drop_sel(profile=drop_ds.profile, errors="ignore")
 	ds_full = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
-
 
 	logger.info("Loading train data")
 	data = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
@@ -220,12 +274,13 @@ def main():
 	n_pc = 2
 	n_gmm = 7
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
-	map_arctic_value(
-		ds_full.to_dataframe(),
-		name=f"output_{n_pc}_comp-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
-		hue="label",
-		palette="pastel"
-	)
+	plot_mean_profile_allinone(ds_full)
+	# map_arctic_value(
+	# 	ds_full.to_dataframe(),
+	# 	name=f"output_{n_pc}_comp-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+	# 	hue="label",
+	# 	palette="pastel"
+	# )
 
 
 if __name__ == "__main__":
