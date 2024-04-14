@@ -336,7 +336,9 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 				gridsize=80,  # Adjust the gridsize to your preference
 				cmap=cm.cm.dense,  # Choose the colormap you prefer
 				transform=ccrs.PlateCarree(),
-				bins='log'
+				bins='log',
+				vmin=1,
+				vmax=5e2,
 			)
 
 			# Add colorbar
