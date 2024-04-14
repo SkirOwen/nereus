@@ -20,7 +20,7 @@ from nereus import logger
 
 from nereus.plots.plots import map_arctic_value
 from nereus.datasets import load_data
-from nereus.utils.directories import get_data_dir
+from nereus.utils.directories import *
 
 
 def get_scaler(value):
@@ -160,7 +160,7 @@ def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
 	return comps, exp_vars, temp_sal_score
 
 
-def plot_mean_profile_allinone(ds_fit) -> None:
+def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 	"""
 	Plot mean profile for each class in a single figure.
 
@@ -172,15 +172,7 @@ def plot_mean_profile_allinone(ds_fit) -> None:
 	num_classes = len(unique_labels)
 
 	fig, axs = plt.subplots(1, 2, figsize=(8, 6), dpi=300)
-	color_list = [
-		'red',
-		'saddlebrown',
-		'deepskyblue',
-		'purple',
-		"darkolivegreen",
-		"orange",
-		"turquoise"
-	]  # Define your own color list
+	# Define your own color list
 
 	for i in range(num_classes):
 		ds_class = ds_fit.where(ds_fit.label == i, drop=True)
@@ -194,24 +186,34 @@ def plot_mean_profile_allinone(ds_fit) -> None:
 		qua50_salinity = np.quantile(ds_class['sal'], 0.50, axis=0)
 
 		ax = axs[0]
-		ax.plot(qua50_temp, ds_fit['pres'].values, c=color_list[i], label=f'Class {i}')
-		ax.fill_betweenx(ds_fit['pres'].values, qua5_temp, qua95_temp, color=color_list[i], alpha=0.5)
-		ax.legend(loc="upper right")
+		ax.plot(qua50_temp, ds_fit['pres'].values, c=cmap[i], label=f'Class {i}')
+		ax.fill_betweenx(ds_fit['pres'].values, qua5_temp, qua95_temp, color=cmap[i], alpha=0.5)
+		ax.legend(loc="lower right")
 		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
 		ax.set_ylabel('Pressure (dbar)')
-		ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
+		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
 		ax.set_xlabel('Temperature (°C)')
+		ax.invert_yaxis()
 
 		ax = axs[1]
-		ax.plot(qua50_salinity, ds_fit['pres'].values, c=color_list[i], label=f'Class {i}')
-		ax.fill_betweenx(ds_fit['pres'].values, qua5_salinity, qua95_salinity, color=color_list[i], alpha=0.5)
+		ax.plot(qua50_salinity, ds_fit['pres'].values, c=cmap[i], label=f'Class {i}')
+		ax.fill_betweenx(ds_fit['pres'].values, qua5_salinity, qua95_salinity, color=cmap[i], alpha=0.5)
 		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
 		# ax.legend(loc='lower left')
 		# ax.set_ylabel('Pressure')
-		ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
+		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
 		ax.set_ylabel('')
 		ax.set_xlabel('Salinity (g/kg)')
+		ax.invert_yaxis()
 
+	plt.tight_layout()
+
+	plt.savefig(
+		os.path.join(
+			get_plot_dir(),
+			f"mean_{num_classes}_profiles-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.png"
+		)
+	)
 	plt.show()
 
 
@@ -271,15 +273,27 @@ def run(benchmark, n_pc, n_gmm):
 
 
 def main():
+
+	colour_palette = [
+		"#cc6677",   # red              pinkish / dusty rose
+		"#ddcc77",   # brown-orange     sand
+		"#117733",  # dark green        darkish green
+		"#88ccee",   # light blue
+		"#44aa99",  # tesl blue         blue-green
+		"#882255",   # dark magenta     red purple
+		"#332288",   # deep blue        dark royal blue
+	]
+
 	n_pc = 2
-	n_gmm = 7
+	n_gmm = 4
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
-	plot_mean_profile_allinone(ds_full)
+	plot_mean_profile_allinone(ds_full, cmap=colour_palette)
 	# map_arctic_value(
 	# 	ds_full.to_dataframe(),
-	# 	name=f"output_{n_pc}_comp-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+	# 	name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
 	# 	hue="label",
-	# 	palette="pastel"
+	# 	s=5,
+	# 	palette=colour_palette
 	# )
 
 
