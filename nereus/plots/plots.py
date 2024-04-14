@@ -307,7 +307,8 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 	if decade:
 		decades = [
 			("pre-2005", data.where(data.time.dt.year.load() < 2005, drop=True)),
-			("post-2005", data.where(data.time.dt.year.load() >= 2005, drop=True))]
+			("post-2005", data.where(data.time.dt.year.load() >= 2005, drop=True))
+		]
 	else:
 		decades = [("all", data)]
 
@@ -324,7 +325,7 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 	ext = []
 
 	for d, (dec_name, dec) in enumerate(decades):
-		for i, data_seas in enumerate(data.groupby(dec.time.dt.season)):
+		for i, data_seas in enumerate(dec.groupby(dec.time.dt.season)):
 			ax = get_arctic_map(ax=axs[d, i])
 
 			# Create the 2D histogram using hexbin
