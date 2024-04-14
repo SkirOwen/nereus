@@ -18,12 +18,12 @@ from matplotlib.figure import Figure
 
 from rich.console import Console
 
-import nereus.datasets.merged
+import nereus.datasets
 from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
 
-def get_arctic_map(ax=None) -> tuple[Figure, None] | Axes:
+def get_arctic_map(ax: Axes | None =None) -> tuple[Figure, None] | Axes:
 	if ax is None:
 		fig = plt.figure(figsize=(10, 10), dpi=300)
 		ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
@@ -52,12 +52,13 @@ def map_arctic_value(df, name=None, **snskwargs):
 			data=df,
 			x="lon",
 			y="lat",
-			s=1,
 			ax=ax,
 			transform=ccrs.PlateCarree(),
 			markers="h",
 			**snskwargs
 		)
+	plt.legend(markerscale=2)
+	plt.tight_layout()
 	logger.info("Saving")
 	plt.savefig(os.path.join(get_plot_dir(), f"map_{name}.png"))
 	logger.info("Done")
@@ -304,50 +305,84 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 	import cmocean as cm
 
 	if decade:
-		decades = [("pre-2005", data.time.dt.year < 2005), ("post-2005", data.time.dt.year >= 2005)]
+		decades = [
+			("pre-2005", data.where(data.time.dt.year.load() < 2005, drop=True)),
+			("post-2005", data.where(data.time.dt.year.load() >= 2005, drop=True))]
 	else:
 		decades = [("all", data)]
 
-	for dec_name, dec in decades:
-		for i, data_seas in enumerate(data.groupby(dec.time.dt.season)):
-			fig, ax = get_arctic_map()
-			gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+	fig, axs = plt.subplots(
+		nrows=len(decades),
+		ncols=4,
+		figsize=(10, 8),
+		dpi=300,
+		layout='constrained',
+		subplot_kw=dict(projection=ccrs.NorthPolarStereo())
+	)
 
+	# gs = plt.GridSpec(nrows=len(decades), ncols=4)
+	ext = []
+
+	for d, (dec_name, dec) in enumerate(decades):
+		for i, data_seas in enumerate(data.groupby(dec.time.dt.season)):
+			ax = get_arctic_map(ax=axs[d, i])
 
 			# Create the 2D histogram using hexbin
 			hb = ax.hexbin(
 				x=data_seas[1]['lon'],
 				y=data_seas[1]['lat'],
 				# C=data["temp"].values,
-				gridsize=(80),  # Adjust the gridsize to your preference
+				gridsize=80,  # Adjust the gridsize to your preference
 				cmap=cm.cm.dense,  # Choose the colormap you prefer
 				transform=ccrs.PlateCarree(),
 				bins='log'
 			)
 
 			# Add colorbar
-			cbar = plt.colorbar(hb, ax=ax, orientation='vertical', pad=0.05, label='Number of data points')
 
 			# Make colorbar height same as plot
-			ax_size = ax.get_position()
-			cbar.ax.set_position([ax_size.x1 + 0.1, ax_size.y0, 0.03, ax_size.height])
+			# ax_size = ax.get_position()
+			# cbar.ax.set_position([ax_size.x1 + 0.1, ax_size.y0, 0.03, ax_size.height])
 
 			# Adjust longitude and latitude labels
-			gl.xlocator = mticker.FixedLocator(np.concatenate([np.arange(-180, 180, 20), np.arange(-180, 180, 20)]))
-			gl.xformatter = LONGITUDE_FORMATTER
-			gl.xlabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
-			gl.yformatter = LATITUDE_FORMATTER
-			gl.ylocator = mticker.FixedLocator(np.arange(65, 90, 5), 200)
-			gl.ylabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
+			# gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
+			# gl.xlocator = mticker.FixedLocator(np.concatenate([np.arange(-180, 180, 20), np.arange(-180, 180, 20)]))
+			# gl.xformatter = LONGITUDE_FORMATTER
+			# gl.xlabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
+			# gl.yformatter = LATITUDE_FORMATTER
+			# gl.ylocator = mticker.FixedLocator(np.arange(65, 90, 5), 200)
+			# gl.ylabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
 
-			plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_s{data_seas[0]}_d{dec_name}.png"), dpi=1000)
-			plt.show()
+			ax.set_title(f"{data_seas[0]}")
+		ext.append([axs[d, 0].get_window_extent().y0, axs[d, 0].get_window_extent().height])
+
+	inv = fig.transFigure.inverted()
+	upper_left = ext[0][0] + (ext[0][1] / fig.bbox.y1)
+	upper_center = inv.transform((0.5, upper_left))
+	lower_right = ext[1][0] + (ext[1][1] / fig.bbox.y1)
+	lower_center = inv.transform((0.5, lower_right))
+
+	plt.figtext(0.5, upper_center[1] + 0.02, "Pre 2005", va="center", ha="center", size=15)
+	plt.figtext(0.5, lower_center[1] - 0.04, "Post 2005", va="center", ha="center", size=15)
+
+	cbar = plt.colorbar(
+		hb,
+		ax=axs.ravel().tolist(),
+		orientation="vertical",
+		shrink=0.7,
+		pad=0.05,
+		label="Number of data points",
+	)
+
+	# plt.tight_layout()
+	fig.suptitle("Histogram of the data density per season pre and post 2005", size=18)
+	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_s{data_seas[0]}_d{dec_name}.png"), dpi=1000)
+	plt.show()
 
 
 def main():
-	ds = nereus.datasets.merged.load()
+	ds = nereus.datasets.load_data()
 
-	spatial_density(ds, season=True)
 	spatial_density(ds, season=True, decade=True)
 
 
