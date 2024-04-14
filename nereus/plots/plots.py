@@ -20,7 +20,7 @@ from rich.console import Console
 
 import nereus.datasets
 from nereus import logger
-from nereus.utils.directories import get_plot_dir
+from nereus.utils.directories import *
 
 
 def get_arctic_map(ax: Axes | None =None) -> tuple[Figure, None] | Axes:
@@ -162,7 +162,7 @@ def time_hist(metadatas) -> None:
 	plt.show()
 
 
-def all_spatial(metadata, udash, argos):
+def all_spatial_old(metadata, udash, argos):
 	itp_lat = metadata["latitude(N+)"].values
 	udash_lat = udash.lat.data
 	argo_lat = np.concatenate([a.LATITUDE.data for a in argos])
@@ -192,6 +192,41 @@ def all_spatial(metadata, udash, argos):
 		markers="h",
 	)
 
+	plt.savefig(os.path.join(get_plot_dir(), "all_spatial.png"), dpi=1000)
+	plt.show()
+
+
+def all_spatial_xr(itps: xr.Dataset, udash: xr.Dataset, argos: xr.Dataset):
+	itp_lat = itps.lat.data
+	udash_lat = udash.lat.data
+	argo_lat = argos.lat.data
+
+	itp_lon = itps.lon.data
+	udash_lon = udash.lon.data
+	argo_lon = argos.lon.data
+
+	df_itp = pd.DataFrame({'lat': itp_lat, "lon": itp_lon, 'source': 'itp'})
+	df_udash = pd.DataFrame({'lat': udash_lat, "lon": udash_lon, 'source': 'udash'})
+	df_argo = pd.DataFrame({'lat': argo_lat, "lon": argo_lon, 'source': 'argo'})
+	# Concatenate all DataFrames
+	combined_df = pd.concat([df_itp, df_udash, df_argo])
+	combined_df["source"] = combined_df["source"].astype(str)
+	combined_df_droped = combined_df.drop_duplicates(["lat", "lon", "source"])
+
+	fig, ax = get_arctic_map()
+
+	sns.scatterplot(
+		data=combined_df_droped,
+		x="lon",
+		y="lat",
+		hue="source",
+		s=3,
+		ax=ax,
+		transform=ccrs.PlateCarree(),
+		markers="h",
+	)
+	plt.legend(title="Sources", markerscale=4)
+	plt.tight_layout()
 	plt.savefig(os.path.join(get_plot_dir(), "all_spatial.png"), dpi=1000)
 	plt.show()
 
@@ -315,7 +350,7 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 	fig, axs = plt.subplots(
 		nrows=len(decades),
 		ncols=4,
-		figsize=(10, 8),
+		figsize=(10, 7),
 		dpi=300,
 		layout='constrained',
 		subplot_kw=dict(projection=ccrs.NorthPolarStereo())
@@ -365,8 +400,8 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 	lower_right = ext[1][0] + (ext[1][1] / fig.bbox.y1)
 	lower_center = inv.transform((0.5, lower_right))
 
-	plt.figtext(0.5, upper_center[1] + 0.02, "Pre 2005", va="center", ha="center", size=15)
-	plt.figtext(0.5, lower_center[1] - 0.04, "Post 2005", va="center", ha="center", size=15)
+	plt.figtext(0.5, upper_center[1] + 0.0, "Pre 2005", va="center", ha="center", size=15)
+	plt.figtext(0.5, lower_center[1] - 0.05, "Post 2005", va="center", ha="center", size=15)
 
 	cbar = plt.colorbar(
 		hb,
@@ -379,14 +414,20 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 
 	# plt.tight_layout()
 	fig.suptitle("Histogram of the data density per season pre and post 2005", size=18)
-	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_s{data_seas[0]}_d{dec_name}.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_season_2005.png"), dpi=1000)
 	plt.show()
 
 
 def main():
-	ds = nereus.datasets.load_data()
+	# ds = nereus.datasets.load_data()
+	#
+	# spatial_density(ds, season=True, decade=True)
 
-	spatial_density(ds, season=True, decade=True)
+	itps = xr.open_dataset(os.path.join(get_data_dir(), "itp", "cache", "itps_xr.nc"))
+	udash = xr.open_dataset(os.path.join(get_data_dir(), "udash", "udash_xr.nc"))
+	argos = xr.open_dataset(os.path.join(get_data_dir(), "argo", "argos_xr.nc"))
+
+	all_spatial_xr(itps, udash, argos)
 
 
 if __name__ == "__main__":
