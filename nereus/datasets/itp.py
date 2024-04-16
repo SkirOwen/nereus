@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import datetime
+import functools
 import glob
 import os.path
 import re
@@ -374,7 +375,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for results in tqdm(pool.imap(itp_parser, files, **kwargs), total=len(files), desc="Parsing itps"):
+		for results in tqdm(pool.imap(functools.partial(itp_parser, **kwargs), files), total=len(files), desc="Parsing itps"):
 			if results is not None:
 				data, metadata = results
 				itps.append(data)
