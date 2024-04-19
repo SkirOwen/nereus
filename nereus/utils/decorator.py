@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+
 import psutil
 
 from nereus.utils.simple_functions import convert_bytes

@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import os
 import shutil
+
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
@@ -13,6 +14,7 @@ from tqdm import tqdm
 
 from nereus import logger
 from nereus.utils.directories import get_argo_dir
+
 
 URL = "https://data-argo.ifremer.fr"
 

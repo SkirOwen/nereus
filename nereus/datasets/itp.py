@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import datetime
+import functools
 import glob
 import os.path
 import re
@@ -9,28 +11,21 @@ import shutil
 import ssl
 import urllib.request
 
-import aiohttp
-import asyncio
-
-from functools import partial
-
-from urllib.parse import urljoin
-
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
+from urllib.parse import urljoin
 
+import aiohttp
 import numpy as np
-import polars as pl
 import pandas as pd
 import xarray as xr
 
 from tqdm import tqdm
 
 from nereus import logger
-
+from nereus.utils.directories import get_itp_cache_dir, get_itp_dir, get_itp_extracted_dir
 from nereus.utils.downloader import downloader
 from nereus.utils.file_ops import calculate_md5
-from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir, get_itp_cache_dir
 from nereus.utils.iterable_ops import skipwise
 
 
@@ -309,10 +304,10 @@ def itp_parser(
 		if len(lines) <= nbr_filter + 5:
 			return None
 
-		if float(lines[3].split()[0]) >= low_filter:
+		if float(lines[3].split()[0]) > low_filter:
 			return None
 
-		if float(lines[-2].split()[0]) <= high_filter:
+		if float(lines[-2].split()[0]) < high_filter:
 			return None
 
 	# the header of the metadata is in two parts separated by a colon
@@ -374,7 +369,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for results in tqdm(pool.imap(itp_parser, files, **kwargs), total=len(files), desc="Parsing itps"):
+		for results in tqdm(pool.imap(functools.partial(itp_parser, **kwargs), files), total=len(files), desc="Parsing itps"):
 			if results is not None:
 				data, metadata = results
 				itps.append(data)
@@ -386,48 +381,48 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	return itps, metadata
 
 
-def itps_to_df(save_df: bool = True, regenerate: bool = False):
-	""""""
-	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
-	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+# def itps_to_df(save_df: bool = True, regenerate: bool = False):
+# 	""""""
+# 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
+# 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+#
+# 	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
+#
+# 	# TODO: backend option to choose pandas vs polars
+# 	if regenerate or not cache_exist:
+# 		itps, metadatas = parser_all_itp()
+#
+# 		df_metadatas = pl.DataFrame(metadatas)
+# 		logger.info("Converting ITPs to dataframe")
+# 		df_itps = pl.concat([pl.DataFrame(itp) for itp in tqdm(itps, desc="Itps")], how="diagonal")
+# 		if save_df:
+# 			logger.info("Saving to file")
+# 			df_itps.write_parquet(itps_filepath)
+# 			df_metadatas.write_csv(metadata_filepath)
+#
+# 	else:
+# 		df_itps = pd.read_parquet(itps_filepath)
+# 		df_metadatas = pd.read_csv(metadata_filepath)
+#
+# 	return df_itps, df_metadatas
 
-	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
 
-	# TODO: backend option to choose pandas vs polars
-	if regenerate or not cache_exist:
-		itps, metadatas = parser_all_itp()
-
-		df_metadatas = pl.DataFrame(metadatas)
-		logger.info("Converting ITPs to dataframe")
-		df_itps = pl.concat([pl.DataFrame(itp) for itp in tqdm(itps, desc="Itps")], how="diagonal")
-		if save_df:
-			logger.info("Saving to file")
-			df_itps.write_parquet(itps_filepath)
-			df_metadatas.write_csv(metadata_filepath)
-
-	else:
-		df_itps = pd.read_parquet(itps_filepath)
-		df_metadatas = pd.read_csv(metadata_filepath)
-
-	return df_itps, df_metadatas
-
-
-def load_itp(regenerate: bool = False, join: bool = False):
-	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
-	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
-
-	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
-
-	if regenerate or not cache_exist:
-		itps_to_df()
-
-	df_itps = pd.read_parquet(itps_filepath)
-	df_metadatas = pd.read_csv(metadata_filepath)
-	if join:
-		df_metadatas = df_metadatas.set_index("file")
-		return df_itps.join(df_metadatas, on="file")
-	else:
-		return df_itps, df_metadatas
+# def load_itp(regenerate: bool = False, join: bool = False):
+# 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
+# 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
+#
+# 	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
+#
+# 	if regenerate or not cache_exist:
+# 		itps_to_df()
+#
+# 	df_itps = pd.read_parquet(itps_filepath)
+# 	df_metadatas = pd.read_csv(metadata_filepath)
+# 	if join:
+# 		df_metadatas = df_metadatas.set_index("file")
+# 		return df_itps.join(df_metadatas, on="file")
+# 	else:
+# 		return df_itps, df_metadatas
 
 
 def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
@@ -511,12 +506,15 @@ def preload_itp(clean_df=True, **kwargs):
 
 
 def main():
-	itps_path = preload_itp(
-		dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
-		base_dim="pressure(dbar)",
-		x_inter=None
-	)
-	print(itps_path)
+	# itps_path = preload_itp(
+	# 	dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
+	# 	base_dim="pressure(dbar)",
+	# 	x_inter=None
+	# )
+	# print(itps_path)
+	meta, itp = parser_all_itp(filtering=False)
+	print(len(meta))
+	print(len(itp))
 
 
 if __name__ == "__main__":

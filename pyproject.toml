@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nereus"
+dynamic = ["version"]
+authors = [
+    { name="Owen Allemang"}
+]
+requires-python = ">=3.10"
+readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/SkirOwen/nereus"
+
+[tool.isort]
+profile = "pycharm"
+skip_glob = ["docs/*", "data/*"]
+src_paths = ["nereus", "tests"]
+indent = "tab"
+line_length = 120
+force_grid_wrap = 5
+lexicographical = true
+include_trailing_comma = true
+single_line_exclusions = ['typing']
+lines_between_types = 1
+
+[tool.ruff]
+exclude = ["peisong"]
+line-length = 120
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+indent-style = "tab"

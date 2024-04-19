@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import unittest
-
 
 def convert_bytes(size: float) -> str:
 	"""Function to convert bytes into a human-readable format

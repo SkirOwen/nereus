@@ -6,6 +6,7 @@ import os
 
 from nereus.config import get_nereus_dir
 
+
 CACHE_MAPPING = os.path.join(get_nereus_dir(), "nereus", "cache_mapping")
 
 
