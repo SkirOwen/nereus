@@ -9,6 +9,7 @@ from .logger import make_logger
 __all__ = [
 	"logger",
 	"cluster",
+	"datasets",
 	"plots",
 	"processing",
 ]
