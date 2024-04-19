@@ -19,7 +19,7 @@ def prepare_training_data(
 		ds_cleaned: xr.Dataset,
 		ratio_monthly_sampled: float = 1,
 		proj=ccrs.NorthPolarStereo(),
-) -> xr.Dataset:
+	) -> xr.Dataset:
 	"""
 	Prepare the training data by spatially and temporally sample the cleaned data.
 
@@ -44,12 +44,12 @@ def prepare_training_data(
 	ds_cleaned_monthly_sampled = ramdon_sample_by_month(
 		ds_cleaned_spatially_sampled,
 		ratio_monthly_sampled,
-		random_seed=0
+		random_seed=0,
 	)
-	ds_cleaned_monthly_sampled['lat_step'] = lat_step
-	ds_cleaned_monthly_sampled['lon_step'] = lon_step
-	ds_cleaned_monthly_sampled['quantile4T'] = quantile4T
-	print(f'threshold={threshold}, training dataset size={len(ds_cleaned_monthly_sampled.profile)}')
+	ds_cleaned_monthly_sampled["lat_step"] = lat_step
+	ds_cleaned_monthly_sampled["lon_step"] = lon_step
+	ds_cleaned_monthly_sampled["quantile4T"] = quantile4T
+	print(f"threshold={threshold}, training dataset size={len(ds_cleaned_monthly_sampled.profile)}")
 	return ds_cleaned_monthly_sampled
 
 
@@ -59,7 +59,7 @@ def cal_threshold(
 		lon_step: float,
 		quantile: float,
 		proj: ccrs.CRS,
-) -> int:
+	) -> int:
 	"""
 	Calculate the threshold based on the difference between adjacent elements in the sorted latitude-longitude bins.
 
@@ -98,7 +98,7 @@ def drop_profiles(
 		lon_step: float,
 		threshold: int,
 		proj: ccrs.CRS,
-) -> xr.Dataset:
+	) -> xr.Dataset:
 	"""
 	Drop the profiles in the bins with sample size larger than the threshold.
 
@@ -141,8 +141,8 @@ def drop_profiles(
 def ramdon_sample_by_month(
 		ds: xr.Dataset,
 		ratio: float,
-		random_seed: int = 0
-) -> xr.Dataset:
+		random_seed: int = 0,
+	) -> xr.Dataset:
 	"""
 	Sample profiles by month based on a given ratio.
 
@@ -157,13 +157,13 @@ def ramdon_sample_by_month(
 	if ratio < 0 or ratio > 1:
 		raise ValueError("Ratio must be between 0 and 1.")
 
-	if 'time' not in ds:
+	if "time" not in ds:
 		raise ValueError("Input dataset must have a 'time' variable.")
 
-	if 'profile' not in ds.dims:
+	if "profile" not in ds.dims:
 		raise ValueError("Input dataset must have a 'profile' dimension.")
 
-	ds_monthly = ds.groupby('time.month')
+	ds_monthly = ds.groupby("time.month")
 	months_with_data = [month for month in ds_monthly.groups.keys() if len(ds_monthly[month]) > 0]
 
 	if not months_with_data:
@@ -183,9 +183,10 @@ def ramdon_sample_by_month(
 				int(selected_size_monthly), replace=False
 			)
 		) for month in months_with_data],
-		dim='profile')
+		dim="profile",
+	)
 
-	ds_selected['profile'] = np.arange(ds_selected.sizes['profile'])
+	ds_selected["profile"] = np.arange(ds_selected.sizes["profile"])
 
 	return ds_selected
 

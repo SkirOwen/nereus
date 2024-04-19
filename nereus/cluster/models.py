@@ -47,12 +47,12 @@ def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 	fig, axes = plt.subplots(nrows=1, ncols=nbr_values, figsize=(8, 6), dpi=300)
 	for v in range(nbr_values):
 		for i in range(n_pc):
-			axes[v].plot(comps[v][i], data['pres'], label=f'Comp {i}, Exp_var:{exp_vars[v][i]:.2f}')
-		axes[v].axvline(x=0, color='grey', linestyle='--')
+			axes[v].plot(comps[v][i], data["pres"], label=f"Comp {i}, Exp_var:{exp_vars[v][i]:.2f}")
+		axes[v].axvline(x=0, color="grey", linestyle="--")
 		axes[v].set_title(titles[v])
-		axes[v].set_xlabel('PCA Values')
+		axes[v].set_xlabel("PCA Values")
 		if v == 0:
-			axes[v].set_ylabel('Pressure (dbar)')
+			axes[v].set_ylabel("Pressure (dbar)")
 		axes[v].invert_yaxis()
 		# set the yticklabels to its absolute values
 		axes[v].legend()
@@ -62,7 +62,7 @@ def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 
 def fit_gmm(args):
 	i, temp_sal_score = args
-	gmm_model = GaussianMixture(n_components=i, covariance_type='full')
+	gmm_model = GaussianMixture(n_components=i, covariance_type="full")
 	gmm_model.fit(temp_sal_score)
 	aic = gmm_model.aic(temp_sal_score)
 	bic = gmm_model.bic(temp_sal_score)
@@ -79,9 +79,9 @@ def cal_AIC_BIC_Si(temp_sal_score: np.ndarray, max_components: int = 20):
 					fit_gmm, [(i, temp_sal_score) for i in range(2, max_components)]
 				),
 				total=max_components - 2,
-				desc="Gaussian"
-				)
+				desc="Gaussian",
 			)
+		)
 
 	aic, bic, silhouette_scores, models = zip(*results)
 	return aic, bic, silhouette_scores
@@ -97,37 +97,37 @@ def plot_AIC_BIC_Si(aic, bic, silhouette_scores, max_components: int = 20):
 	axes[0, 0].plot(range(2, max_components), aic)
 	axes[0, 0].set_xticks(range(2, max_components))
 	# axes[0, 0].set_xlabel('Number of components')
-	axes[0, 0].set_ylabel('AIC')
+	axes[0, 0].set_ylabel("AIC")
 	axes[0, 0].grid()
 
 	axes[0, 1].plot(range(2, max_components - 1), aic_grad)
 	axes[0, 1].set_xticks(range(2, max_components - 1))
 	# axes[0, 1].set_xlabel('Number of components')
-	axes[0, 1].set_ylabel('AIC gradient')
+	axes[0, 1].set_ylabel("AIC gradient")
 	axes[0, 1].grid()
 
 	axes[1, 0].plot(range(2, max_components), bic)
 	axes[1, 0].set_xticks(range(2, max_components))
 	# axes[1, 0].set_xlabel('Number of components')
-	axes[1, 0].set_ylabel('BIC')
+	axes[1, 0].set_ylabel("BIC")
 	axes[1, 0].grid()
 
 	axes[1, 1].plot(range(2, max_components - 1), bic_grad)
 	axes[1, 1].set_xticks(range(2, max_components - 1))
 	# axes[1, 1].set_xlabel('Number of components')
-	axes[1, 1].set_ylabel('BIC gradient')
+	axes[1, 1].set_ylabel("BIC gradient")
 	axes[1, 1].grid()
 
 	axes[2, 0].plot(range(2, max_components), silhouette_scores)
 	axes[2, 0].set_xticks(range(2, max_components))
-	axes[2, 0].set_xlabel('Number of components')
-	axes[2, 0].set_ylabel('Silhouette coefficient')
+	axes[2, 0].set_xlabel("Number of components")
+	axes[2, 0].set_ylabel("Silhouette coefficient")
 	axes[2, 0].grid()
 
 	axes[2, 1].plot(range(2, max_components - 1), silhouette_scores_grad)
 	axes[2, 1].set_xticks(range(2, max_components - 1))
-	axes[2, 1].set_xlabel('Number of components')
-	axes[2, 1].set_ylabel('Silhouette coefficient gradient')
+	axes[2, 1].set_xlabel("Number of components")
+	axes[2, 1].set_ylabel("Silhouette coefficient gradient")
 	axes[2, 1].grid()
 
 	plt.subplots_adjust(wspace=0.4, hspace=0.3)
@@ -177,41 +177,40 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 	for i in range(num_classes):
 		ds_class = ds_fit.where(ds_fit.label == i, drop=True)
 
-		qua5_temp = np.quantile(ds_class['temp'], 0.05, axis=0)
-		qua95_temp = np.quantile(ds_class['temp'], 0.95, axis=0)
-		qua50_temp = np.quantile(ds_class['temp'], 0.50, axis=0)
+		qua5_temp = np.quantile(ds_class["temp"], 0.05, axis=0)
+		qua95_temp = np.quantile(ds_class["temp"], 0.95, axis=0)
+		qua50_temp = np.quantile(ds_class["temp"], 0.50, axis=0)
 
-		qua5_salinity = np.quantile(ds_class['sal'], 0.05, axis=0)
-		qua95_salinity = np.quantile(ds_class['sal'], 0.95, axis=0)
-		qua50_salinity = np.quantile(ds_class['sal'], 0.50, axis=0)
+		qua5_salinity = np.quantile(ds_class["sal"], 0.05, axis=0)
+		qua95_salinity = np.quantile(ds_class["sal"], 0.95, axis=0)
+		qua50_salinity = np.quantile(ds_class["sal"], 0.50, axis=0)
 
 		ax = axs[0]
-		ax.plot(qua50_temp, ds_fit['pres'].values, c=cmap[i], label=f'Class {i}')
-		ax.fill_betweenx(ds_fit['pres'].values, qua5_temp, qua95_temp, color=cmap[i], alpha=0.5)
+		ax.plot(qua50_temp, ds_fit["pres"].values, c=cmap[i], label=f"Class {i}")
+		ax.fill_betweenx(ds_fit["pres"].values, qua5_temp, qua95_temp, color=cmap[i], alpha=0.5)
 		ax.legend(loc="lower right")
-		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
-		ax.set_ylabel('Pressure (dbar)')
+		ax.set_ylim([np.min(ds_fit["pres"].values), np.max(ds_fit["pres"].values)])
+		ax.set_ylabel("Pressure (dbar)")
 		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
-		ax.set_xlabel('Temperature (°C)')
+		ax.set_xlabel("Temperature (°C)")
 		ax.invert_yaxis()
 
 		ax = axs[1]
-		ax.plot(qua50_salinity, ds_fit['pres'].values, c=cmap[i], label=f'Class {i}')
-		ax.fill_betweenx(ds_fit['pres'].values, qua5_salinity, qua95_salinity, color=cmap[i], alpha=0.5)
-		ax.set_ylim([np.min(ds_fit['pres'].values), np.max(ds_fit['pres'].values)])
+		ax.plot(qua50_salinity, ds_fit["pres"].values, c=cmap[i], label=f"Class {i}")
+		ax.fill_betweenx(ds_fit["pres"].values, qua5_salinity, qua95_salinity, color=cmap[i], alpha=0.5)
+		ax.set_ylim([np.min(ds_fit["pres"].values), np.max(ds_fit["pres"].values)])
 		# ax.legend(loc='lower left')
 		# ax.set_ylabel('Pressure')
 		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
-		ax.set_ylabel('')
-		ax.set_xlabel('Salinity (g/kg)')
+		ax.set_ylabel("")
+		ax.set_xlabel("Salinity (g/kg)")
 		ax.invert_yaxis()
 
 	plt.tight_layout()
 
 	plt.savefig(
 		os.path.join(
-			get_plot_dir(),
-			f"mean_{num_classes}_profiles-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.png"
+			get_plot_dir(), f"mean_{num_classes}_profiles-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}.png"
 		)
 	)
 	plt.show()
@@ -228,7 +227,7 @@ def run(benchmark, n_pc, n_gmm):
 	drop_ds = ds.sel(pres=slice(350, None)).where(
 		np.logical_and(
 			ds.sel(pres=slice(350, None)).sal > 25,
-			ds.sel(pres=slice(350, None)).sal < 27
+			ds.sel(pres=slice(350, None)).sal < 27,
 		), drop=True
 	)
 	ds = ds.drop_sel(profile=drop_ds.profile, errors="ignore")
@@ -244,7 +243,7 @@ def run(benchmark, n_pc, n_gmm):
 	drop_ds = ds.sel(pres=slice(350, None)).where(
 		np.logical_and(
 			ds.sel(pres=slice(350, None)).sal > 25,
-			ds.sel(pres=slice(350, None)).sal < 27
+			ds.sel(pres=slice(350, None)).sal < 27,
 		), drop=True
 	)
 	ds = ds.drop_sel(profile=drop_ds.profile)
@@ -273,15 +272,14 @@ def run(benchmark, n_pc, n_gmm):
 
 
 def main():
-
 	colour_palette = [
-		"#cc6677",   # red              pinkish / dusty rose
-		"#ddcc77",   # brown-orange     sand
+		"#cc6677",  # red              pinkish / dusty rose
+		"#ddcc77",  # brown-orange     sand
 		"#117733",  # dark green        darkish green
-		"#88ccee",   # light blue
+		"#88ccee",  # light blue
 		"#44aa99",  # tesl blue         blue-green
-		"#882255",   # dark magenta     red purple
-		"#332288",   # deep blue        dark royal blue
+		"#882255",  # dark magenta     red purple
+		"#332288",  # deep blue        dark royal blue
 	]
 
 	n_pc = 2

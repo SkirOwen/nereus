@@ -23,44 +23,44 @@ from nereus.utils.downloader import downloader
 URL = "https://hs.pangaea.de/Projects/UDASH/UDASH.zip"
 
 UDASH_COLUMN_TYPE = {
-	'Prof_no': int,
-	'Cruise': str,
-	'Station': str,
-	'Platform': str,
-	'Type': str,
+	"Prof_no": int,
+	"Cruise": str,
+	"Station": str,
+	"Platform": str,
+	"Type": str,
 	# 'yyyy-mm-ddThh:mm': datetime,
-	'Longitude_[deg]': float,
-	'Latitude_[deg]': float,
-	'Pressure_[dbar]': float,
-	'Depth_[m]': float,
-	'QF_Depth_[m]': int,
-	'Temp_[C]': float,
-	'QF_Temp_[C]': int,
-	'Salinity_[psu]': float,
-	'QF_Salinity_[psu]': int,
-	'Source': str,
-	'DOI': str,
-	'WOD-Cruise-ID': str,
-	'WOD-Cast-ID': str,
+	"Longitude_[deg]": float,
+	"Latitude_[deg]": float,
+	"Pressure_[dbar]": float,
+	"Depth_[m]": float,
+	"QF_Depth_[m]": int,
+	"Temp_[C]": float,
+	"QF_Temp_[C]": int,
+	"Salinity_[psu]": float,
+	"QF_Salinity_[psu]": int,
+	"Source": str,
+	"DOI": str,
+	"WOD-Cruise-ID": str,
+	"WOD-Cast-ID": str,
 }
 
 rename_col = {
-	"Prof_no":          "profile",
-	"Cruise":           "cruise",
-	"Station":          "station",
-	"Platform":         "platform",
-	"Type":             "type",
-	'yyyy-mm-ddThh:mm': "time",
-	'Longitude_[deg]':  "lon",
-	'Latitude_[deg]':   "lat",
-	'Pressure_[dbar]':  "pres",
-	'Depth_[m]':        "depth",
+	"Prof_no": "profile",
+	"Cruise": "cruise",
+	"Station": "station",
+	"Platform": "platform",
+	"Type": "type",
+	"yyyy-mm-ddThh:mm": "time",
+	"Longitude_[deg]": "lon",
+	"Latitude_[deg]": "lat",
+	"Pressure_[dbar]": "pres",
+	"Depth_[m]": "depth",
 	# 'QF_Depth_[m]': int,
-	'Temp_[C]':          "temp",
+	"Temp_[C]": "temp",
 	# 'QF_Temp_[C]': int,
-	'Salinity_[psu]':   "sal",
+	"Salinity_[psu]": "sal",
 	# 'QF_Salinity_[psu]': int,
-	'Source':           "source",
+	"Source": "source",
 	# 'DOI': str,
 	# 'WOD-Cruise-ID': str,
 	# 'WOD-Cast-ID': str,
@@ -79,11 +79,13 @@ def _extract_udash(file: None | str = None) -> None:
 	shutil.unpack_archive(
 		filename=os.path.join(udash_dir, "UDASH.zip"),
 		extract_dir=udash_dir,
-		format="zip"
+		format="zip",
 	)
 
 
-def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True) -> pd.DataFrame:
+def _udash_fileparser(
+	filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True
+) -> pd.DataFrame:
 	lines = []
 	with open(filepath, "r") as f:
 		for line in f:
@@ -99,7 +101,7 @@ def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool =
 
 	data = {key: [] for key in keys}
 
-	for line in (lines[1:]):
+	for line in lines[1:]:
 		for i, v in enumerate(line.split()):
 			key = keys[i]
 			if key == "yyyy-mm-ddThh:mm":
@@ -126,7 +128,7 @@ def _udash_fileparser(filepath: str, filtering: bool = True, remove_argo: bool =
 	# logger.info("filter")
 	if filtering:
 		# Use the filter method to apply the conditions to each group
-		data = data.groupby('Prof_no').filter(
+		data = data.groupby("Prof_no").filter(
 			partial(filter_groups, dim="Pressure_[dbar]", low=10.0, high=750.0, min_nobs=2)
 		)
 	return data
@@ -143,7 +145,7 @@ def clean_df_udash(data, col_to_drop: None | list[str] = None) -> pd.DataFrame:
 		"QF_Salinity_[psu]",
 		"DOI",
 		"WOD-Cruise-ID",
-		"WOD-Cast-ID"
+		"WOD-Cast-ID",
 	]
 	data.drop(
 		col_to_drop,
@@ -168,7 +170,7 @@ def clean_df_udash(data, col_to_drop: None | list[str] = None) -> pd.DataFrame:
 
 def parse_all_udash(files_nbr: None | int = None, **kwargs) -> pd.DataFrame:
 	udash_extracted_dir = get_udash_extracted_dir()
-	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
+	files = glob.glob(os.path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
 	if files_nbr is not None:
 		files = files[:files_nbr]
@@ -178,7 +180,9 @@ def parse_all_udash(files_nbr: None | int = None, **kwargs) -> pd.DataFrame:
 	udash = []
 
 	with Pool(6) as pool:
-		for data in tqdm(pool.imap(partial(_udash_fileparser, **kwargs), files), total=len(files), desc="Parsing udash"):
+		for data in tqdm(
+			pool.imap(partial(_udash_fileparser, **kwargs), files), total=len(files), desc="Parsing udash"
+		):
 			udash.append(data)
 			gc.collect()
 
@@ -188,11 +192,7 @@ def parse_all_udash(files_nbr: None | int = None, **kwargs) -> pd.DataFrame:
 
 
 def filter_groups(group, dim, low, high, min_nobs):
-	mask = (
-		group[dim].max() >= high and
-		group[dim].min() <= low and
-		len(group[dim]) > min_nobs
-	)
+	mask = group[dim].max() >= high and group[dim].min() <= low and len(group[dim]) > min_nobs
 	return mask
 
 
@@ -215,7 +215,7 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, *
 		"lat":      np.full(x_inter.shape, udash["lat"].values[0]),
 		"lon":      np.full(x_inter.shape, udash["lon"].values[0]),
 		"source":   np.full(x_inter.shape, udash["source"].values[0]),
-		base_dim:   x_inter
+		base_dim:   x_inter,
 	}
 
 	for dim in dims:
@@ -227,14 +227,12 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, *
 
 
 def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
-	unique_coords = udash.drop_duplicates('profile').set_index('profile')[
-		["lat", "lon", "time", "cruise", "source"]
-	]
+	unique_coords = udash.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time", "cruise", "source"]]
 	udash.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(udash)
-	for coord in ["lat", 'lon', 'time', "cruise", "source"]:
-		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	for coord in ["lat", "lon", "time", "cruise", "source"]:
+		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
@@ -282,7 +280,6 @@ def main():
 
 	udash = parse_all_udash(filtering=False, remove_argo=False, remove_itp=False)
 	print(len(udash))
-
 
 	# download_udash(URL)
 	# _extract_udash()

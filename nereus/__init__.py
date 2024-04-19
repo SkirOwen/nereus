@@ -17,6 +17,5 @@ __all__ = [
 logger: logging.Logger
 
 logger = make_logger(
-	level="INFO"
+	level="INFO",
 )
-

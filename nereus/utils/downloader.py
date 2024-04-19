@@ -48,10 +48,10 @@ progress = Progress(
 	TimeRemainingColumn(),
 	", ",
 	TransferSpeedColumn(),
-	"]"
+	"]",
 )
-	# bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
-	# " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+# bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
+# " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
 
 
 def _get_response_size(resp: HTTPResponse) -> None | int:
@@ -80,6 +80,7 @@ def _get_response(url: str) -> HTTPResponse:
 		response = urllib.request.urlopen(url)
 	except urllib.error.HTTPError:
 		from http.cookiejar import CookieJar
+
 		cj = CookieJar()
 		opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 		request = urllib.request.Request(url)
@@ -92,11 +93,12 @@ def _get_response(url: str) -> HTTPResponse:
 	except urllib.error.URLError:
 		# work around to be able to dl the 10m coastline without issue
 		import ssl
+
 		ssl._create_default_https_context = ssl._create_unverified_context
 		req = urllib.request.Request(url)
 		req.add_header(
-			'user-agent',
-			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+			"user-agent",
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36",
 		)
 		response = urllib.request.urlopen(req)
 	return response
@@ -150,7 +152,7 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 			root = os.path.abspath(root)
 			for url in urls:
 				filename = url.split("/")[-1]
-				filename = filename.split("?")[0]   # Removing HTML tag/option
+				filename = filename.split("?")[0]  # Removing HTML tag/option
 				target_path = os.path.join(root, filename)
 				task = progress.add_task("Download", filename=filename, start=False, total=len(urls))
 
@@ -171,7 +173,7 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 
 def main():
 	url = [
-		'https://imgs.xkcd.com/comics/overlapping_circles.png',
+		"https://imgs.xkcd.com/comics/overlapping_circles.png",
 	]
 	response = _get_response(url[0])
 	print(response)
