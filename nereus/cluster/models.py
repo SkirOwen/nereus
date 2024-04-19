@@ -46,17 +46,19 @@ def pca_score(value, n_pc: int, scaler):
 
 def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 	nbr_values = comps.shape[0]
-	fig, axes = plt.subplots(nrows=1, ncols=nbr_values, figsize=(10, 5), dpi=300)
+	fig, axes = plt.subplots(nrows=1, ncols=nbr_values, figsize=(8, 6), dpi=300)
 	for v in range(nbr_values):
 		for i in range(n_pc):
-			axes[v].plot(comps[v][i], data['pres'], label=f'EOF {i}, Exp_var:{exp_vars[v][i]:.2f}')
+			axes[v].plot(comps[v][i], data['pres'], label=f'Comp {i}, Exp_var:{exp_vars[v][i]:.2f}')
 		axes[v].axvline(x=0, color='grey', linestyle='--')
 		axes[v].set_title(titles[v])
 		axes[v].set_xlabel('PCA Values')
-		axes[v].set_ylabel('Pressure (dbar)')
+		if v == 0:
+			axes[v].set_ylabel('Pressure (dbar)')
 		axes[v].invert_yaxis()
 		# set the yticklabels to its absolute values
 		axes[v].legend()
+	plt.tight_layout()
 	plt.show()
 
 
