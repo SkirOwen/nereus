@@ -10,7 +10,6 @@ from http.client import HTTPResponse
 from threading import Event
 from typing import Generator, Sequence
 
-from rich.panel import Panel
 from rich.progress import (
 	BarColumn,
 	DownloadColumn,
