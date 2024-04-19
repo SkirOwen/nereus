@@ -12,13 +12,15 @@ readme = "README.md"
 profile = "pycharm"
 skip_glob = ["docs/*", "data/*"]
 src_paths = ["nereus", "tests"]
-lexicographical = true
 indent = "tab"
+line_length = 120
+lexicographical = true
 single_line_exclusions = ['typing']
 lines_between_types = 1
 
 [tool.ruff]
 exclude = ["peisong"]
+line-length = 120
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
