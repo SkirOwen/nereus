@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import asyncio
 import datetime
 import functools
 import glob
@@ -10,16 +11,11 @@ import shutil
 import ssl
 import urllib.request
 
-import aiohttp
-import asyncio
-
-from functools import partial
-
-from urllib.parse import urljoin
-
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import Pool
+from urllib.parse import urljoin
 
+import aiohttp
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -27,10 +23,9 @@ import xarray as xr
 from tqdm import tqdm
 
 from nereus import logger
-
+from nereus.utils.directories import get_itp_cache_dir, get_itp_dir, get_itp_extracted_dir
 from nereus.utils.downloader import downloader
 from nereus.utils.file_ops import calculate_md5
-from nereus.utils.directories import get_itp_dir, get_itp_extracted_dir, get_itp_cache_dir
 from nereus.utils.iterable_ops import skipwise
 
 

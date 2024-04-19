@@ -3,23 +3,21 @@ from __future__ import annotations
 import datetime
 import os
 
-import numpy as np
-import matplotlib.pyplot as plt
-import xarray as xr
-from tqdm import tqdm
-
-from sklearn.mixture import GaussianMixture
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
-
 from multiprocessing import Pool
 
-import nereus
-from nereus import logger
+import matplotlib.pyplot as plt
+import numpy as np
+import xarray as xr
 
-from nereus.plots.plots import map_arctic_value
-from nereus.datasets import load_data
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import StandardScaler
+from tqdm import tqdm
+
+import nereus
+
+from nereus import logger
 from nereus.utils.directories import *
 
 

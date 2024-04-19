@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os.path
-import urllib.request
-import urllib.error
 import signal
+import urllib.error
+import urllib.request
 
 from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPResponse
+from threading import Event
+from typing import Generator, Sequence
+
 from rich.panel import Panel
 from rich.progress import (
 	BarColumn,
@@ -18,9 +21,6 @@ from rich.progress import (
 	TimeRemainingColumn,
 	TransferSpeedColumn,
 )
-from threading import Event
-
-from typing import Generator, Sequence
 
 from nereus import logger
 

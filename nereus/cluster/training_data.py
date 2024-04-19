@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import numpy as np
 import os
-import xarray as xr
+
 import cartopy.crs as ccrs
+import numpy as np
+import xarray as xr
 
 from nereus import logger
+from nereus.datasets.merged import load_data
 from nereus.processing.coordinates_utils import grid_bin_coord
 from nereus.utils.directories import get_data_dir
-from nereus.datasets.merged import load_data
 
 
 def prepare_training_data(

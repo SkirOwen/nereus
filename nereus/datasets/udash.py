@@ -5,20 +5,20 @@ import glob
 import os
 import shutil
 
-from datetime import datetime, date
+from datetime import date, datetime
 from functools import partial
 from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
 import xarray as xr
+
 from tqdm import tqdm
-from rich.progress import track
 
 from nereus import logger
-from nereus.utils.downloader import downloader
 from nereus.utils.directories import get_udash_dir, get_udash_extracted_dir
-from nereus.utils.simple_functions import str2num
+from nereus.utils.downloader import downloader
+
 
 URL = "https://hs.pangaea.de/Projects/UDASH/UDASH.zip"
 

@@ -5,21 +5,21 @@ import warnings
 
 import cartopy.crs as ccrs
 import cmocean as cm
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from matplotlib.gridspec import GridSpec
-from matplotlib.widgets import RadioButtons, Slider, Button
-from matplotlib.colors import Normalize
+from matplotlib.widgets import Button, RadioButtons, Slider
 
 from nereus import logger
 from nereus.cluster.training_data import prepare_training_data
 from nereus.datasets.merged import load_data
 from nereus.plots.plots import get_arctic_map
-from nereus.processing.coordinates_utils import change_coords, grid_bin, grid_bin_coord
+from nereus.processing.coordinates_utils import grid_bin, grid_bin_coord
 from nereus.utils.directories import get_data_dir
 
-import matplotlib as mpl
+
 mpl.use('TkAgg')
 
 

@@ -2,23 +2,26 @@ from __future__ import annotations
 
 import datetime
 import os
+
 from typing import Tuple
 
-import matplotlib.pyplot as plt
+import cartopy.crs as ccrs
+import cmocean as cm
 import matplotlib.path as mpath
-
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import cmocean as cm
-import cartopy.crs as ccrs
 import xarray as xr
+
+from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-
 from rich.console import Console
 
 import nereus.datasets
+
 from nereus import logger
 from nereus.utils.directories import *
 
@@ -335,9 +338,6 @@ def t_s(itp, udash, argos):
 
 
 def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False) -> None:
-	import matplotlib.ticker as mticker
-	from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
-	import cmocean as cm
 
 	if decade:
 		decades = [
