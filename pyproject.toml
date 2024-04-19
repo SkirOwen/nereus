@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nereus"
+dynamic = ["version"]
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.isort]
+profile = "pycharm"
+skip_glob = ["docs/*", "data/*"]
+src_paths = ["nereus", "tests"]
+lexicographical = true
+indent = "tab"
+single_line_exclusions = ['typing']
+lines_between_types = 1
+
+[tool.ruff]
+exclude = ["peisong"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.format]
+indent-style = "tab"
