@@ -96,7 +96,10 @@ async def async_get_filenames_from_url(url: str) -> list[str]:
 	async with aiohttp.ClientSession() as session:
 		try:
 			async with session.get(url, headers={
-				"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
+				"User-Agent":
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+					"AppleWebKit/537.36 (KHTML, like Gecko) "
+					"Chrome/103.0.0.0 Safari/537.36"
 			}) as response:
 				html_content = await response.text()
 
@@ -160,7 +163,9 @@ def _get_filenames_from_url(url: str) -> list[str]:
 	req = urllib.request.Request(url)
 	req.add_header(
 		"user-agent",
-		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+		"AppleWebKit/537.36 (KHTML, like Gecko) "
+		"Chrome/103.0.0.0 Safari/537.36",
 	)
 	response = urllib.request.urlopen(req)
 	html_content = response.read().decode("utf-8")
