@@ -5,8 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nereus"
 dynamic = ["version"]
+authors = [
+    { name="Owen Allemang"}
+]
 requires-python = ">=3.10"
 readme = "README.md"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/SkirOwen/nereus"
 
 [tool.isort]
 profile = "pycharm"
