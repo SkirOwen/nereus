@@ -105,7 +105,7 @@ def _get_response(url: str) -> HTTPResponse:
 	return response
 
 
-def _url_download(url: str, path: str, task: TaskID, total: int = 1) -> None:
+def _url_download(url: str, path: str, task: TaskID) -> None:
 	"""
 	Download an url to a local file
 
