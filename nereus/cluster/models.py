@@ -218,7 +218,7 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
-	data_full = nereus.load_data().load()
+	data_full = nereus.datasets.load_data().load()
 	ds = data_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
 	ds = ds.where(~(ds.temp > 25), drop=True)
 	ds = ds.where(~(ds.sal < 15), drop=True)
