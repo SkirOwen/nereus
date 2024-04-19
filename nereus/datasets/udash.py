@@ -166,7 +166,7 @@ def clean_df_udash(data, col_to_drop: None | list[str] = None) -> pd.DataFrame:
 	return data
 
 
-def parse_all_udash(files_nbr: None | int = None) -> pd.DataFrame:
+def parse_all_udash(files_nbr: None | int = None, **kwargs) -> pd.DataFrame:
 	udash_extracted_dir = get_udash_extracted_dir()
 	files = glob.glob(os. path.join(udash_extracted_dir, "ArcticOcean_*.txt"))
 
@@ -178,7 +178,7 @@ def parse_all_udash(files_nbr: None | int = None) -> pd.DataFrame:
 	udash = []
 
 	with Pool(6) as pool:
-		for data in tqdm(pool.imap(_udash_fileparser, files), total=len(files), desc="Parsing udash"):
+		for data in tqdm(pool.imap(partial(_udash_fileparser, **kwargs), files), total=len(files), desc="Parsing udash"):
 			udash.append(data)
 			gc.collect()
 
@@ -278,7 +278,11 @@ def preload_udash(**kwargs) -> str:
 
 
 def main():
-	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
+	# preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
+
+	udash = parse_all_udash(filtering=False, remove_argo=False, remove_itp=False)
+	print(len(udash))
+
 
 	# download_udash(URL)
 	# _extract_udash()
