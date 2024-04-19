@@ -310,10 +310,10 @@ def itp_parser(
 		if len(lines) <= nbr_filter + 5:
 			return None
 
-		if float(lines[3].split()[0]) >= low_filter:
+		if float(lines[3].split()[0]) > low_filter:
 			return None
 
-		if float(lines[-2].split()[0]) <= high_filter:
+		if float(lines[-2].split()[0]) < high_filter:
 			return None
 
 	# the header of the metadata is in two parts separated by a colon
@@ -512,12 +512,15 @@ def preload_itp(clean_df=True, **kwargs):
 
 
 def main():
-	itps_path = preload_itp(
-		dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
-		base_dim="pressure(dbar)",
-		x_inter=None
-	)
-	print(itps_path)
+	# itps_path = preload_itp(
+	# 	dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
+	# 	base_dim="pressure(dbar)",
+	# 	x_inter=None
+	# )
+	# print(itps_path)
+	meta, itp = parser_all_itp(filtering=False)
+	print(len(meta))
+	print(len(itp))
 
 
 if __name__ == "__main__":
