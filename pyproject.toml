@@ -16,6 +16,7 @@ indent = "tab"
 line_length = 120
 force_grid_wrap = 5
 lexicographical = true
+include_trailing_comma = true
 single_line_exclusions = ['typing']
 lines_between_types = 1
 
