@@ -98,7 +98,7 @@ def load_all_argo() -> list:
 # 	)
 
 
-def process_argo(argo, x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=["TEMP", "PSAL", "DOX2_ADJUSTED"]):
+def process_argo(argo, x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=("TEMP", "PSAL", "DOX2_ADJUSTED")):
 	processed = []
 
 	for i in range(argo.TIME.size):
