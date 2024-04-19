@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import datetime
 import os
-
-from typing import Tuple
 
 import cartopy.crs as ccrs
 import cmocean as cm
@@ -20,13 +17,11 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from rich.console import Console
 
-import nereus.datasets
-
 from nereus import logger
-from nereus.utils.directories import *
+from nereus.utils.directories import get_plot_dir
 
 
-def get_arctic_map(ax: Axes | None = None) -> tuple[Figure, None] | Axes:
+def get_arctic_map(ax: Axes | None = None, labels: bool = False) -> tuple[Figure, Axes] | Axes:
 	if ax is None:
 		fig = plt.figure(figsize=(10, 10), dpi=300)
 		ax = fig.add_subplot(1, 1, 1, projection=ccrs.NorthPolarStereo())
@@ -40,6 +35,17 @@ def get_arctic_map(ax: Axes | None = None) -> tuple[Figure, None] | Axes:
 	circle = mpath.Path(verts * radius + center)
 	ax.coastlines()
 	ax.set_boundary(circle, transform=ax.transAxes)
+
+	# Adjust longitude and latitude labels
+	if labels:
+		gl = ax.gridlines(draw_labels=True, linewidth=0.5, color="gray", alpha=0.5, linestyle="--")
+		gl.xlocator = mticker.FixedLocator(np.concatenate([np.arange(-180, 180, 20), np.arange(-180, 180, 20)]))
+		gl.xformatter = LONGITUDE_FORMATTER
+		gl.xlabel_style = {"size": 11, "color": "k", "rotation": 0}
+		gl.yformatter = LATITUDE_FORMATTER
+		gl.ylocator = mticker.FixedLocator(np.arange(65, 90, 5), 200)
+		gl.ylabel_style = {"size": 11, "color": "k", "rotation": 0}
+
 	if ax_created:
 		return fig, ax
 	else:
@@ -381,15 +387,6 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 			# ax_size = ax.get_position()
 			# cbar.ax.set_position([ax_size.x1 + 0.1, ax_size.y0, 0.03, ax_size.height])
 
-			# Adjust longitude and latitude labels
-			# gl = ax.gridlines(draw_labels=True, linewidth=0.5, color='gray', alpha=0.5, linestyle='--')
-			# gl.xlocator = mticker.FixedLocator(np.concatenate([np.arange(-180, 180, 20), np.arange(-180, 180, 20)]))
-			# gl.xformatter = LONGITUDE_FORMATTER
-			# gl.xlabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
-			# gl.yformatter = LATITUDE_FORMATTER
-			# gl.ylocator = mticker.FixedLocator(np.arange(65, 90, 5), 200)
-			# gl.ylabel_style = {'size': 11, 'color': 'k', 'rotation': 0}
-
 			ax.set_title(f"{data_seas[0]}")
 		ext.append([axs[d, 0].get_window_extent().y0, axs[d, 0].get_window_extent().height])
 
@@ -413,11 +410,13 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 
 	# plt.tight_layout()
 	fig.suptitle("Histogram of the data density per season pre and post 2005", size=18)
-	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_season_2005.png"), dpi=1000)
+	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_season_2005_d{len(decades)}.png"), dpi=1000)
 	plt.show()
 
 
 def main():
+	from nereus.utils.directories import get_data_dir
+
 	# ds = nereus.datasets.load_data()
 	#
 	# spatial_density(ds, season=True, decade=True)
