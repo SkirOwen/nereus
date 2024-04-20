@@ -50,7 +50,7 @@ def calculate_md5(file_path: str) -> str:
 
 
 def create_cache_filename(name: str, **kwargs) -> str:
-	combined_string = "_".join(f"{key}={value}" for key, value in kwargs.items())
+	combined_string = f"{name}_".join(f"{key}={value}" for key, value in kwargs.items())
 
 	hash_object = hashlib.md5(combined_string.encode())
 	hash_string = hash_object.hexdigest()
