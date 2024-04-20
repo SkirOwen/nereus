@@ -266,7 +266,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 	]
 
 	with ThreadPoolExecutor(max_workers=4) as pool:
-		for task, itp in enumerate(tqdm(all_itps)):
+		for itp in tqdm(all_itps):
 			itp_filepath = os.path.join(itp_dir, itp)
 			pool.submit(_extract_itp, itp_filepath, target_dir)
 		logger.info("All ITPs have been extracted.")
