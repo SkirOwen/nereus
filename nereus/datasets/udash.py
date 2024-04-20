@@ -72,7 +72,7 @@ def download_udash(url: str, override: bool = False) -> None:
 	downloader(url, udash_dir, override=override)
 
 
-def _extract_udash(file: None | str = None) -> None:
+def _extract_udash() -> None:
 	udash_dir = get_udash_dir()
 	logger.info("Extracting UDASH.")
 
