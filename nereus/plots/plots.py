@@ -57,7 +57,7 @@ def map_arctic_value(df, name=None, **snskwargs):
 
 	logger.info("Scatter plot, takes some time")
 	with Console().status("Loading") as st:
-		g = sns.scatterplot(
+		sns.scatterplot(
 			data=df,
 			x="lon",
 			y="lat",
