@@ -136,6 +136,7 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 def preload_argo(**kwargs) -> str:
 	# check download
 	# parse
+	parallel = False
 
 	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
 
@@ -148,10 +149,11 @@ def preload_argo(**kwargs) -> str:
 		base_dim = "PRES"
 		dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
 
-		# with ProcessPoolExecutor(6) as executor:
-		# 	results = executor.map(process_argo, argos)
-		# 	for result in tqdm(results, total=len(argos)):
-		# 		processed_argo.extend(result)
+		if parallel:
+			with ProcessPoolExecutor(6) as executor:
+				results = executor.map(process_argo, argos)
+				for result in tqdm(results, total=len(argos)):
+					processed_argo.extend(result)
 
 		for argo in tqdm(argos):
 			for i in range(argo.TIME.size):
