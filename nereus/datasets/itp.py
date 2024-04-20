@@ -32,7 +32,7 @@ from nereus.utils.iterable_ops import skipwise
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
-col_itp = [
+COL_ITP = [
 	"pressure(dbar)",
 	"temperature(C)",
 	"salinity",
@@ -53,10 +53,10 @@ col_itp = [
 	"nbio",
 ]
 
-col_meta = ["file", "source", "ITP", "profile", "year", "day", "longitude(E+)", "latitude(N+)", "ndepths", "time"]
+COL_META = ["file", "source", "ITP", "profile", "year", "day", "longitude(E+)", "latitude(N+)", "ndepths", "time"]
 
 
-rename_col = {
+RENAME_COL = {
 	"pressure(dbar)": "pres",
 	"temperature(C)": "temp",
 	"salinity": "sal",
@@ -498,7 +498,7 @@ def preload_itp(clean_df=True, **kwargs):
 			logger.info("Join")
 			df_itps = df_itps.join(metadatas, on="file")
 
-			df_itps.rename(columns=rename_col, inplace=True)
+			df_itps.rename(columns=RENAME_COL, inplace=True)
 			if clean_df:
 				logger.info("Clean df")
 				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
