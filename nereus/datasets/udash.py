@@ -84,7 +84,7 @@ def _extract_udash() -> None:
 
 
 def _udash_fileparser(
-	filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True
+		filepath: str, filtering: bool = True, remove_argo: bool = True, remove_itp: bool = True
 ) -> pd.DataFrame:
 	lines = []
 	with open(filepath, "r") as f:
