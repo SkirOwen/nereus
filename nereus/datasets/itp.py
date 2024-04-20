@@ -32,36 +32,46 @@ from nereus.utils.iterable_ops import skipwise
 URL = "https://scienceweb.whoi.edu/itp/data/"
 MD5_URL = "https://scienceweb.whoi.edu/itp-md5sums/MD5SUMS"
 
-col_itp = [
-	'pressure(dbar)', 'temperature(C)', 'salinity', 'nobs', 'file',
-	'east(cm/s)', 'north(cm/s)', 'vert(cm/s)', 'nacm', 'dissolved_oxygen',
-	'CDOM(ppb)', 'PAR(uE/m^2/s)', 'turbidity(/m/sr)x10^4',
-	'chlorophyll-a(ug/l)', 'dissolved_oxygen(umol/kg)', 'turbidity(e-4)',
-	'chlorophyll_a(ug/l)', 'nbio'
+COL_ITP = [
+	"pressure(dbar)",
+	"temperature(C)",
+	"salinity",
+	"nobs",
+	"file",
+	"east(cm/s)",
+	"north(cm/s)",
+	"vert(cm/s)",
+	"nacm",
+	"dissolved_oxygen",
+	"CDOM(ppb)",
+	"PAR(uE/m^2/s)",
+	"turbidity(/m/sr)x10^4",
+	"chlorophyll-a(ug/l)",
+	"dissolved_oxygen(umol/kg)",
+	"turbidity(e-4)",
+	"chlorophyll_a(ug/l)",
+	"nbio",
 ]
 
-col_meta = [
-	'file', 'source', 'ITP', 'profile', 'year', 'day', 'longitude(E+)',
-	'latitude(N+)', 'ndepths', 'time'
-]
+COL_META = ["file", "source", "ITP", "profile", "year", "day", "longitude(E+)", "latitude(N+)", "ndepths", "time"]
 
 
-rename_col = {
-	'pressure(dbar)': "pres",
-	'temperature(C)': "temp",
-	'salinity': "sal",
-	'east(cm/s)': "east",
-	'north(cm/s)': "north",
-	'vert(cm/s)': "vert",
-	'CDOM(ppb)': "CDOM",
+RENAME_COL = {
+	"pressure(dbar)": "pres",
+	"temperature(C)": "temp",
+	"salinity": "sal",
+	"east(cm/s)": "east",
+	"north(cm/s)": "north",
+	"vert(cm/s)": "vert",
+	"CDOM(ppb)": "CDOM",
 	# 'PAR(uE/m^2/s)':,
 	# 'turbidity(/m/sr)x10^4',
 	# 'chlorophyll-a(ug/l)',
-	'dissolved_oxygen(umol/kg)': "dis_oxy",
+	"dissolved_oxygen(umol/kg)": "dis_oxy",
 	# 'turbidity(e-4)',
 	# 'chlorophyll_a(ug/l)',
-	'longitude(e+)': "lon",
-	'latitude(n+)': "lat",
+	"longitude(e+)": "lon",
+	"latitude(n+)": "lat",
 	# 'ndepths',
 	# 'time'
 }
@@ -86,7 +96,11 @@ async def async_get_filenames_from_url(url: str) -> list[str]:
 	async with aiohttp.ClientSession() as session:
 		try:
 			async with session.get(url, headers={
-				'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'}) as response:
+				"User-Agent":
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+					"AppleWebKit/537.36 (KHTML, like Gecko) "
+					"Chrome/103.0.0.0 Safari/537.36"
+			}) as response:
 				html_content = await response.text()
 
 			lines = html_content.split("\n")
@@ -123,11 +137,8 @@ async def async_get_filenames_from_url(url: str) -> list[str]:
 
 			return file_urls
 
-		except Exception as e:
-			logger.error(
-				f"Error accessing {url}: {e}\n"
-				f"Try with '_get_filenames_from_url'"
-			)
+		except (aiohttp.ClientError, aiohttp.InvalidURL, aiohttp.ClientResponseError, asyncio.TimeoutError) as e:
+			logger.error(f"Error accessing {url}: {e}\n" f"Try with '_get_filenames_from_url'")
 			return []
 
 
@@ -151,8 +162,10 @@ def _get_filenames_from_url(url: str) -> list[str]:
 	ssl._create_default_https_context = ssl._create_unverified_context
 	req = urllib.request.Request(url)
 	req.add_header(
-		'user-agent',
-		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+		"user-agent",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+		"AppleWebKit/537.36 (KHTML, like Gecko) "
+		"Chrome/103.0.0.0 Safari/537.36",
 	)
 	response = urllib.request.urlopen(req)
 	html_content = response.read().decode("utf-8")
@@ -194,11 +207,11 @@ def get_md5sum_dict() -> dict[str, str]:
 	if not os.path.exists(md5sum_filepath):
 		downloader([MD5_URL], get_itp_dir())
 
-	hash = calculate_md5(md5sum_filepath)
-	if not (hash == "67ecdfe4bac8a5fd277bdf67cb59d7b6"):
+	hash_md5 = calculate_md5(md5sum_filepath)
+	if not (hash_md5 == "092cc1dccdd6fbbc0521273e2133fa11"):
 		logger.info("The md5 of the md5 file did not match.")
 
-	with open(md5sum_filepath, "r") as f:
+	with open(md5sum_filepath, "r", encoding="utf-8") as f:
 		lines = f.readlines()
 
 	md5_dict = {
@@ -253,7 +266,7 @@ def extract_all_itps(itp_dir: str, target_dir: None | str = None):
 	]
 
 	with ThreadPoolExecutor(max_workers=4) as pool:
-		for task, itp in enumerate(tqdm(all_itps)):
+		for itp in tqdm(all_itps):
 			itp_filepath = os.path.join(itp_dir, itp)
 			pool.submit(_extract_itp, itp_filepath, target_dir)
 		logger.info("All ITPs have been extracted.")
@@ -265,7 +278,7 @@ def itp_parser(
 		nbr_filter: int = 2,
 		low_filter: float = 10.0,
 		high_filter: float = 750.0,
-	) -> tuple[pd.DataFrame, dict] | None:
+) -> tuple[pd.DataFrame, dict] | None:
 	"""
 	Parse data from an ITP file.
 
@@ -330,8 +343,8 @@ def itp_parser(
 	metadata.update(zip(attribute_names, metadata_values))
 
 	metadata["time"] = (
-			datetime.datetime(year=metadata["year"], month=1, day=1) +
-			datetime.timedelta(days=metadata["day"] - 1)  # -1 because Jan 1st is day 1.0000
+		datetime.datetime(year=metadata["year"], month=1, day=1) +
+		datetime.timedelta(days=metadata["day"] - 1)  # -1 because Jan 1st is day 1.0000
 	)
 
 	# The name of the variables are stored on line 2
@@ -369,7 +382,9 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	itps = []
 
 	with Pool() as pool:
-		for results in tqdm(pool.imap(functools.partial(itp_parser, **kwargs), files), total=len(files), desc="Parsing itps"):
+		for results in tqdm(
+			pool.imap(functools.partial(itp_parser, **kwargs), files), total=len(files), desc="Parsing itps"
+		):
 			if results is not None:
 				data, metadata = results
 				itps.append(data)
@@ -425,7 +440,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 # 		return df_itps, df_metadatas
 
 
-def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
 	# This will take dims as y for interpolation
 	# such as dims = f(base_dim)
 	# then take x_inter, a range of point on which to interpolate
@@ -438,8 +453,8 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 
 	x_inter = np.arange(10, 760, 10)
 	interp_itp = {
-		"file": itp["file"].values[:len(x_inter)],  # So everything has the same length
-		base_dim: x_inter
+		"file": itp["file"].values[: len(x_inter)],  # So everything has the same length
+		base_dim: x_inter,
 	}
 
 	for dim in dims:
@@ -451,13 +466,13 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-	unique_coords = df_itps.drop_duplicates('file').set_index('file')[['lat', 'lon', 'time']]
+	unique_coords = df_itps.drop_duplicates("file").set_index("file")[["lat", "lon", "time"]]
 	df_itps.rename(columns={"file": "profile"}, inplace=True)
 	df_itps.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(df_itps)
-	for coord in ['lat', 'lon', 'time']:
-		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	for coord in ["lat", "lon", "time"]:
+		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
@@ -476,12 +491,14 @@ def preload_itp(clean_df=True, **kwargs):
 				processed_itps.append(new_itp)
 
 			logger.info("Concat")
-			df_itps = pd.concat(processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list())
+			df_itps = pd.concat(
+				processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list()
+			)
 
 			logger.info("Join")
 			df_itps = df_itps.join(metadatas, on="file")
 
-			df_itps.rename(columns=rename_col, inplace=True)
+			df_itps.rename(columns=RENAME_COL, inplace=True)
 			if clean_df:
 				logger.info("Clean df")
 				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)

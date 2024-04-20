@@ -9,6 +9,7 @@ from .logger import make_logger
 __all__ = [
 	"logger",
 	"cluster",
+	"datasets",
 	"plots",
 	"processing",
 ]
@@ -17,6 +18,5 @@ __all__ = [
 logger: logging.Logger
 
 logger = make_logger(
-	level="INFO"
+	level="INFO",
 )
-

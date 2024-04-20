@@ -36,7 +36,7 @@ def extract_argo() -> None:
 	shutil.unpack_archive(
 		filename=os.path.join(argo_dir, filename[0]),
 		extract_dir=argo_dir,
-		format="gztar"
+		format="gztar",
 	)
 
 
@@ -98,7 +98,7 @@ def load_all_argo() -> list:
 # 	)
 
 
-def process_argo(argo, 	x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=["TEMP", "PSAL", "DOX2_ADJUSTED"]):
+def process_argo(argo, x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=("TEMP", "PSAL", "DOX2_ADJUSTED")):
 	processed = []
 
 	for i in range(argo.TIME.size):
@@ -110,7 +110,7 @@ def process_argo(argo, 	x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=["
 			"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
 			"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
 			"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
-			base_dim: x_inter
+			base_dim: x_inter,
 		}
 
 		for dim in dims:
@@ -124,12 +124,12 @@ def process_argo(argo, 	x_inter=np.arange(10, 760, 10), base_dim="PRES", dims=["
 
 
 def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
-	unique_coords = argos.drop_duplicates('profile').set_index('profile')[['lat', 'lon', 'time']]
+	unique_coords = argos.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
 	argos.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(argos)
-	for coord in ['lat', 'lon', 'time']:
-		ds = ds.assign_coords({coord: ('profile', unique_coords[coord])})
+	for coord in ["lat", "lon", "time"]:
+		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
@@ -161,12 +161,11 @@ def preload_argo(**kwargs) -> str:
 					continue
 
 				interp_argo = {
-
 					"time": np.full(x_inter.shape, argo.TIME[i].data),
 					"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
 					"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
 					"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
-					base_dim: x_inter
+					base_dim: x_inter,
 				}
 
 				for dim in dims:

@@ -22,7 +22,7 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 
 	ds = xr.open_mfdataset([itps_file, udash_file, argo_file], chunks="auto", parallel=True)
 
-	ds = format_merged(ds)
+	ds = format_merged(ds, **kwargs)
 
 	# if kwargs["save"]:
 	# 	cache_path = ""

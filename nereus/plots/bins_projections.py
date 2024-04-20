@@ -20,7 +20,7 @@ from nereus.processing.coordinates_utils import grid_bin, grid_bin_coord
 from nereus.utils.directories import get_data_dir
 
 
-mpl.use('TkAgg')
+mpl.use("TkAgg")
 
 
 def map_groups_proj(latlon_groups, proj):
@@ -83,14 +83,14 @@ def plot_g(latlon_groups, ax1, proj) -> None:
 
 def plot_hex(df, ax, **kwargs):
 	hb = ax.hexbin(
-		x=df['lon'],
-		y=df['lat'],
+		x=df["lon"],
+		y=df["lat"],
 		# C=data["temp"].values,
 		gridsize=(80),  # Adjust the gridsize to your preference
 		cmap=cm.cm.dense,  # Choose the colormap you prefer
 		transform=ccrs.PlateCarree(),
-		bins='log',
-		**kwargs
+		bins="log",
+		**kwargs,
 	)
 	return hb
 
@@ -126,7 +126,9 @@ def interactive(data):
 
 	# fig, ax1, ax2, g, line = map_groups_proj(latlon_groups, proj=ccrs.NorthPolarStereo())
 	latlon_groups = grid_bin_coord(data, ccrs.NorthPolarStereo(), x_step_start, y_step_start)
-	ds_train = prepare_training_data(x_step_start, y_step_start, quantile4T=0.95, ds_cleaned=data, proj=ccrs.NorthPolarStereo())
+	ds_train = prepare_training_data(
+		x_step_start, y_step_start, quantile4T=0.95, ds_cleaned=data, proj=ccrs.NorthPolarStereo()
+	)
 
 	# ax1
 	plot_g(latlon_groups, ax1, proj=ccrs.NorthPolarStereo())
@@ -144,7 +146,7 @@ def interactive(data):
 	cax = fig.add_axes([0.92, 0.55, 0.02, 0.4])
 	max_count = max(hb3.get_array().max(), hb4.get_array().max())
 	cbar = fig.colorbar(hb4, cax=cax)
-	cbar.set_label('Colorbar Label')
+	cbar.set_label("Colorbar Label")
 
 	axx = fig.add_axes([0.02, 0.50, 0.0225, 0.45])
 	axy = fig.add_axes([0.08, 0.50, 0.0225, 0.45])
@@ -155,7 +157,7 @@ def interactive(data):
 		valmax=500_000,
 		valinit=10_000,
 		valstep=10_000,
-		orientation="vertical"
+		orientation="vertical",
 	)
 	y_slider = Slider(
 		ax=axy,
@@ -164,7 +166,7 @@ def interactive(data):
 		valmax=500_000,
 		valinit=10_000,
 		valstep=10_000,
-		orientation="vertical"
+		orientation="vertical",
 	)
 
 	def update(val):
@@ -189,28 +191,22 @@ def interactive(data):
 		hb4 = plot_hex(ds_train.to_dataframe(), ax4, vmin=vmin, vmax=vmax)
 
 		cbar = fig.colorbar(hb4, cax=cax)
-		cbar.set_label('Colorbar Label')
+		cbar.set_label("Colorbar Label")
 
 		fig.canvas.draw_idle()
+
 	#
 	# x_slider.on_changed(update)
 	# y_slider.on_changed(update)
 
 	recalc_button_ax = fig.add_axes([0.1, 0.90, 0.1, 0.04])
-	button = Button(recalc_button_ax, 'Calc', hovercolor='0.975')
+	button = Button(recalc_button_ax, "Calc", hovercolor="0.975")
 
 	button.on_clicked(update)
 
 	button_ax = fig.add_axes([0.80, 0.50, 0.1, 0.45])
 	button_ax.set_axis_off()
-	radio = RadioButtons(button_ax, [
-		"north",
-		"lambert",
-		"AlbersEqualArea",
-		"EqualEarth",
-		"Nearside",
-		"platecarree"
-	])
+	radio = RadioButtons(button_ax, ["north", "lambert", "AlbersEqualArea", "EqualEarth", "Nearside", "platecarree"])
 
 	def change_proj(val):
 		proj = get_proj(val)
@@ -234,14 +230,14 @@ def interactive(data):
 		hb4 = plot_hex(ds_train.to_dataframe(), ax4, vmin=vmin, vmax=vmax)
 
 		cbar = fig.colorbar(hb4, cax=cax)
-		cbar.set_label('Colorbar Label')
+		cbar.set_label("Colorbar Label")
 
 		fig.canvas.draw_idle()
 
 	radio.on_clicked(change_proj)
 
 	save_button_pos = fig.add_axes([0.60, 0.90, 0.1, 0.04])
-	save_button = Button(save_button_pos, 'save', hovercolor='0.975')
+	save_button = Button(save_button_pos, "save", hovercolor="0.975")
 
 	def save(val):
 		ds_train.to_netcdf(

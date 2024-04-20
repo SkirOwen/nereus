@@ -10,7 +10,6 @@ from http.client import HTTPResponse
 from threading import Event
 from typing import Generator, Sequence
 
-from rich.panel import Panel
 from rich.progress import (
 	BarColumn,
 	DownloadColumn,
@@ -48,10 +47,10 @@ progress = Progress(
 	TimeRemainingColumn(),
 	", ",
 	TransferSpeedColumn(),
-	"]"
+	"]",
 )
-	# bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
-	# " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
+# bar_format="{l_bar}{bar}| {n_fmt}{unit}/{total_fmt}{unit}"
+# " [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
 
 
 def _get_response_size(resp: HTTPResponse) -> None | int:
@@ -80,6 +79,7 @@ def _get_response(url: str) -> HTTPResponse:
 		response = urllib.request.urlopen(url)
 	except urllib.error.HTTPError:
 		from http.cookiejar import CookieJar
+
 		cj = CookieJar()
 		opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 		request = urllib.request.Request(url)
@@ -92,17 +92,20 @@ def _get_response(url: str) -> HTTPResponse:
 	except urllib.error.URLError:
 		# work around to be able to dl the 10m coastline without issue
 		import ssl
+
 		ssl._create_default_https_context = ssl._create_unverified_context
 		req = urllib.request.Request(url)
 		req.add_header(
-			'user-agent',
-			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+			"user-agent",
+			"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+			"AppleWebKit/537.36 (KHTML, like Gecko) "
+			"Chrome/103.0.0.0 Safari/537.36",
 		)
 		response = urllib.request.urlopen(req)
 	return response
 
 
-def _url_download(url: str, path: str, task: TaskID, total: int = 1) -> None:
+def _url_download(url: str, path: str, task: TaskID) -> None:
 	"""
 	Download an url to a local file
 
@@ -150,13 +153,13 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 			root = os.path.abspath(root)
 			for url in urls:
 				filename = url.split("/")[-1]
-				filename = filename.split("?")[0]   # Removing HTML tag/option
+				filename = filename.split("?")[0]  # Removing HTML tag/option
 				target_path = os.path.join(root, filename)
 				task = progress.add_task("Download", filename=filename, start=False, total=len(urls))
 
 				if not os.path.exists(target_path) or override:
 					# TODO: when file present it should only skip if checksum matches, if checksum_check is done
-					pool.submit(_url_download, url, target_path, task, total=len(urls))
+					pool.submit(_url_download, url, target_path, task)
 				else:
 					logger.info(f"Skipping {filename} as already present in {root}")
 
@@ -170,14 +173,17 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 
 
 def main():
-	url = [
-		'https://imgs.xkcd.com/comics/overlapping_circles.png',
-	]
-	response = _get_response(url[0])
-	print(response)
+	from nereus.utils.directories import get_data_dir
 
-	# target_dist = get_download_dir()
-	# downloader(url, target_dist)
+	url = [
+		"https://imgs.xkcd.com/comics/overlapping_circles.png",
+		"https://imgs.xkcd.com/comics/pub_trivia.png",
+	]
+	# response = _get_response(url[0])
+	# print(response)
+
+	target_dist = get_data_dir()
+	downloader(url, target_dist, override=True)
 
 
 if __name__ == "__main__":
