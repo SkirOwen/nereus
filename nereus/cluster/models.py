@@ -18,7 +18,7 @@ from tqdm import tqdm
 import nereus
 
 from nereus import logger
-from nereus.utils.directories import *
+from nereus.utils.directories import get_data_dir, get_plot_dir
 
 
 def get_scaler(value):
