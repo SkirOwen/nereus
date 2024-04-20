@@ -159,7 +159,7 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 
 				if not os.path.exists(target_path) or override:
 					# TODO: when file present it should only skip if checksum matches, if checksum_check is done
-					pool.submit(_url_download, url, target_path, task, total=len(urls))
+					pool.submit(_url_download, url, target_path, task)
 				else:
 					logger.info(f"Skipping {filename} as already present in {root}")
 
