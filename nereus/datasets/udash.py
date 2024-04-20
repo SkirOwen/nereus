@@ -196,7 +196,7 @@ def filter_groups(group, dim, low, high, min_nobs):
 	return mask
 
 
-def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
 	# This will take dims as y for interpolation
 	# such as dims = f(base_dim)
 	# then take x_inter, a range of point on which to interpolate

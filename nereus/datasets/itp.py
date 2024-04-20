@@ -440,7 +440,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 # 		return df_itps, df_metadatas
 
 
-def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
+def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
 	# This will take dims as y for interpolation
 	# such as dims = f(base_dim)
 	# then take x_inter, a range of point on which to interpolate
