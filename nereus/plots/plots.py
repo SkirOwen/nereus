@@ -358,7 +358,7 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 		figsize=(10, 7),
 		dpi=300,
 		layout="constrained",
-		subplot_kw=dict(projection=ccrs.NorthPolarStereo()),
+		subplot_kw={"projection": ccrs.NorthPolarStereo()},
 	)
 
 	# gs = plt.GridSpec(nrows=len(decades), ncols=4)
