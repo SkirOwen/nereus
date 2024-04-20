@@ -207,8 +207,8 @@ def get_md5sum_dict() -> dict[str, str]:
 	if not os.path.exists(md5sum_filepath):
 		downloader([MD5_URL], get_itp_dir())
 
-	hash = calculate_md5(md5sum_filepath)
-	if not (hash == "67ecdfe4bac8a5fd277bdf67cb59d7b6"):
+	hash_md5 = calculate_md5(md5sum_filepath)
+	if not (hash_md5 == "092cc1dccdd6fbbc0521273e2133fa11"):
 		logger.info("The md5 of the md5 file did not match.")
 
 	with open(md5sum_filepath, "r") as f:
