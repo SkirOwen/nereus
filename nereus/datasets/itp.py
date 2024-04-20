@@ -211,7 +211,7 @@ def get_md5sum_dict() -> dict[str, str]:
 	if not (hash_md5 == "092cc1dccdd6fbbc0521273e2133fa11"):
 		logger.info("The md5 of the md5 file did not match.")
 
-	with open(md5sum_filepath, "r") as f:
+	with open(md5sum_filepath, "r", encoding="utf-8") as f:
 		lines = f.readlines()
 
 	md5_dict = {

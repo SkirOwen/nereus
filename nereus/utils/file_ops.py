@@ -56,14 +56,14 @@ def create_cache_filename(name: str, **kwargs) -> str:
 	hash_string = hash_object.hexdigest()
 
 	# Save the mapping
-	with open(CACHE_MAPPING, "a") as file:
+	with open(CACHE_MAPPING, "a", encoding="utf-8") as file:
 		file.write(json.dumps({hash_string: kwargs}) + "\n")
 
 	return f"name_{hash_string}"
 
 
 def retrieve_processing_info(hash_string) -> str | None:
-	with open(CACHE_MAPPING, "r") as file:
+	with open(CACHE_MAPPING, "r", encoding="utf-8") as file:
 		for line in file:
 			mapping = json.loads(line)
 			if hash_string in mapping:
