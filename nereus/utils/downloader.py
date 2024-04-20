@@ -173,14 +173,17 @@ def downloader(urls: Sequence[str], root: str, override: bool = False):
 
 
 def main():
+	from nereus.utils.directories import get_data_dir
+
 	url = [
 		"https://imgs.xkcd.com/comics/overlapping_circles.png",
+		"https://imgs.xkcd.com/comics/pub_trivia.png",
 	]
-	response = _get_response(url[0])
-	print(response)
+	# response = _get_response(url[0])
+	# print(response)
 
-	# target_dist = get_download_dir()
-	# downloader(url, target_dist)
+	target_dist = get_data_dir()
+	downloader(url, target_dist, override=True)
 
 
 if __name__ == "__main__":
