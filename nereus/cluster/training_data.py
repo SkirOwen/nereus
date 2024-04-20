@@ -19,7 +19,7 @@ def prepare_training_data(
 		ds_cleaned: xr.Dataset,
 		ratio_monthly_sampled: float = 1,
 		proj=ccrs.NorthPolarStereo(),
-	) -> xr.Dataset:
+) -> xr.Dataset:
 	"""
 	Prepare the training data by spatially and temporally sample the cleaned data.
 
@@ -59,7 +59,7 @@ def cal_threshold(
 		lon_step: float,
 		quantile: float,
 		proj: ccrs.CRS,
-	) -> int:
+) -> int:
 	"""
 	Calculate the threshold based on the difference between adjacent elements in the sorted latitude-longitude bins.
 
@@ -98,7 +98,7 @@ def drop_profiles(
 		lon_step: float,
 		threshold: int,
 		proj: ccrs.CRS,
-	) -> xr.Dataset:
+) -> xr.Dataset:
 	"""
 	Drop the profiles in the bins with sample size larger than the threshold.
 
@@ -142,7 +142,7 @@ def ramdon_sample_by_month(
 		ds: xr.Dataset,
 		ratio: float,
 		random_seed: int = 0,
-	) -> xr.Dataset:
+) -> xr.Dataset:
 	"""
 	Sample profiles by month based on a given ratio.
 

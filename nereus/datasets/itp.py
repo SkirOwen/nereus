@@ -278,7 +278,7 @@ def itp_parser(
 		nbr_filter: int = 2,
 		low_filter: float = 10.0,
 		high_filter: float = 750.0,
-	) -> tuple[pd.DataFrame, dict] | None:
+) -> tuple[pd.DataFrame, dict] | None:
 	"""
 	Parse data from an ITP file.
 
