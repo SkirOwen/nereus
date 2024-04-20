@@ -66,8 +66,10 @@ def map_arctic_value(df, name=None, **snskwargs):
 			markers="h",
 			**snskwargs,
 		)
-	plt.legend(markerscale=2)
-	plt.tight_layout()
+
+	ax.legend(markerscale=2)
+	fig.tight_layout()
+
 	logger.info("Saving")
 	plt.savefig(os.path.join(get_plot_dir(), f"map_{name}.png"))
 	logger.info("Done")
