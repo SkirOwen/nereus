@@ -137,7 +137,7 @@ async def async_get_filenames_from_url(url: str) -> list[str]:
 
 			return file_urls
 
-		except Exception as e:
+		except (aiohttp.ClientError, aiohttp.InvalidURL, aiohttp.ClientResponseError, asyncio.TimeoutError) as e:
 			logger.error(f"Error accessing {url}: {e}\n" f"Try with '_get_filenames_from_url'")
 			return []
 
