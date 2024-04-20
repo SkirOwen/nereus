@@ -208,7 +208,7 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -
 	# That could be a parameter
 
 	x_inter = np.arange(10, 760, 10)
-	interp_udash = {
+	interp_udash_dict = {
 		"profile":  np.full(x_inter.shape, udash["profile"].values[0]),  # So everything has the same length
 		"cruise":   np.full(x_inter.shape, udash["cruise"].values[0]),
 		"time":     np.full(x_inter.shape, udash["time"].values[0]),
@@ -220,10 +220,10 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -
 
 	for dim in dims:
 		if dim in udash:
-			interp_udash[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
+			interp_udash_dict[dim] = np.interp(x_inter, udash[base_dim].values, udash[dim].values)
 		else:
-			interp_udash[dim] = np.full(x_inter.shape, np.nan)
-	return pd.DataFrame(interp_udash)
+			interp_udash_dict[dim] = np.full(x_inter.shape, np.nan)
+	return pd.DataFrame(interp_udash_dict)
 
 
 def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
