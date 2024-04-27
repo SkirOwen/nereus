@@ -248,7 +248,7 @@ def _extract_itp(file: str, target_directory: None | str = None) -> None:
 
 	Parameters
 	----------
-	file
+	file : str
 	target_directory : str, optional
 		Default will be ./data/itp/extracted
 
@@ -292,10 +292,10 @@ def itp_parser(
 	----------
 	filepath : str
 		The path to the ITP file to be parsed.
-	filtering
-	nbr_filter
-	low_filter
-	high_filter
+	filtering : bool, optional
+	nbr_filter : int, optional
+	low_filter : float, optional
+	high_filter : float, optional
 
 	Returns
 	-------
