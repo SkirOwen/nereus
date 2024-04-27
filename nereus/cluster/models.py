@@ -16,6 +16,7 @@ from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 import nereus
+import nereus.datasets
 
 from nereus import logger
 from nereus.utils.directories import get_data_dir, get_plot_dir
@@ -219,35 +220,11 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
 	data_full = nereus.datasets.load_data().load()
-	ds = data_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
-	ds = ds.where(~(ds.temp > 25), drop=True)
-	ds = ds.where(~(ds.sal < 15), drop=True)
-	ds.where(np.logical_and(ds.sal > 25, ds.sal < 27), drop=True).sel(pres=slice(350, None), drop=True)
-	ds = ds.where(~(ds.sal < 15), drop=True)
-	drop_ds = ds.sel(pres=slice(350, None)).where(
-		np.logical_and(
-			ds.sel(pres=slice(350, None)).sal > 25,
-			ds.sel(pres=slice(350, None)).sal < 27,
-		), drop=True
-	)
-	ds = ds.drop_sel(profile=drop_ds.profile, errors="ignore")
-	ds_full = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds_full = _clean_data(data_full)
 
 	logger.info("Loading train data")
 	data = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
-	ds = data.dropna(dim="profile", subset=["temp", "sal"], how="any")
-	ds = ds.where(~(ds.temp > 25), drop=True)
-	ds = ds.where(~(ds.sal < 15), drop=True)
-	ds.where(np.logical_and(ds.sal > 25, ds.sal < 27), drop=True).sel(pres=slice(350, None), drop=True)
-	ds = ds.where(~(ds.sal < 15), drop=True)
-	drop_ds = ds.sel(pres=slice(350, None)).where(
-		np.logical_and(
-			ds.sel(pres=slice(350, None)).sal > 25,
-			ds.sel(pres=slice(350, None)).sal < 27,
-		), drop=True
-	)
-	ds = ds.drop_sel(profile=drop_ds.profile)
-	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds = _clean_data(data)
 
 	scaler_temp = get_scaler(ds_full["temp"].values)
 	scaler_sal = get_scaler(ds_full["sal"].values)
@@ -269,6 +246,23 @@ def run(benchmark, n_pc, n_gmm):
 		plot_AIC_BIC_Si(aic, bic, sil, max_components=max_comp)
 
 	return ds_full
+
+
+def _clean_data(ds, ):
+	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	ds = ds.where(~(ds.temp > 25), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	ds = ds.where(np.logical_and(ds.sal > 25, ds.sal < 27), drop=True).sel(pres=slice(350, None), drop=True)
+	ds = ds.where(~(ds.sal < 15), drop=True)
+	drop_ds = ds.sel(pres=slice(350, None)).where(
+		np.logical_and(
+			ds.sel(pres=slice(350, None)).sal > 25,
+			ds.sel(pres=slice(350, None)).sal < 27,
+		), drop=True
+	)
+	ds = ds.drop_sel(profile=drop_ds.profile)
+	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	return ds
 
 
 def main():
