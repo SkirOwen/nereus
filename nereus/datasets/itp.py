@@ -453,7 +453,7 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 	x_inter = np.arange(10, 760, 10)
 	interp_itp = {
-		"file": itp["file"].values[: len(x_inter)],  # So everything has the same length
+		"file": np.full(x_inter, itp["file"].values[0]),  # So everything has the same length
 		base_dim: x_inter,
 	}
 
