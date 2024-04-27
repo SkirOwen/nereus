@@ -7,6 +7,7 @@ import xarray as xr
 from nereus.datasets.argo import preload_argo
 from nereus.datasets.itp import preload_itp
 from nereus.datasets.udash import preload_udash
+from nereus.utils.file_ops import create_cache_filename
 
 
 def format_merged(ds, **kwargs) -> xr.Dataset:
@@ -25,13 +26,17 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 	ds = format_merged(ds, **kwargs)
 
 	# if kwargs["save"]:
-	# 	cache_path = ""
-	# 	ds.to_netcdf(cache_path)
+	# 	cache_path = create_cache_filename(name="merged", **kwargs)
+	# 	ds.to_netcdf(
+	# 		cache_path,
+	# 		format="NETCDF4",
+	# 		engine="h5netcdf",
+	# 	)
 	return ds
 
 
 def load_data(**kwargs) -> xr.Dataset:
-	cache_file = ""
+	cache_file = create_cache_filename(name="merged", **kwargs)
 	if os.path.exists(cache_file):
 		ds = xr.open_dataset(cache_file)
 	else:
