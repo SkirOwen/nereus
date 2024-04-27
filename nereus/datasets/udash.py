@@ -209,7 +209,7 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -
 
 	x_inter = np.arange(10, 760, 10)
 	interp_udash_dict = {
-		"profile":  np.full(x_inter.shape, udash["profile"].values[0]),  # So everything has the same length
+		"profile":  np.full(x_inter.shape, f'udash_{udash["profile"].values[0]}'),  # So everything has the same length
 		"cruise":   np.full(x_inter.shape, udash["cruise"].values[0]),
 		"time":     np.full(x_inter.shape, udash["time"].values[0]),
 		"lat":      np.full(x_inter.shape, udash["lat"].values[0]),
@@ -276,10 +276,10 @@ def preload_udash(**kwargs) -> str:
 
 
 def main():
-	# preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
+	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
 
-	udash = parse_all_udash(filtering=False, remove_argo=False, remove_itp=False)
-	print(len(udash))
+	# udash = parse_all_udash(filtering=False, remove_argo=False, remove_itp=False)
+	# print(len(udash))
 
 	# download_udash(URL)
 	# _extract_udash()
