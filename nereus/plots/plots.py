@@ -170,7 +170,6 @@ def udash_months_hist(udash):
 	plot_histogram(udash, x=udash_months, filename="udash_months_hist.png")
 
 
-
 def time_hist(metadatas) -> None:
 	years = pd.to_datetime(metadatas.time).dt.year.values
 	months = pd.to_datetime(metadatas.time).dt.month.values
