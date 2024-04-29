@@ -21,6 +21,22 @@ from nereus import logger
 from nereus.utils.directories import get_plot_dir
 
 
+def save_and_show(filename: str, directory: str = get_plot_dir(), **kwargs) -> None:
+	"""
+	Save the current plot with the specified filename and show it.
+
+	Parameters
+	----------
+	filename : str
+	directory : str
+	"""
+	logger.info(f"Saving {filename}")
+	plt.savefig(os.path.join(directory, filename), **kwargs)
+	logger.info("Saved")
+	logger.info("Plotting")
+	plt.show()
+
+
 def get_arctic_map(ax: Axes | None = None, labels: bool = False) -> tuple[Figure, Axes] | Axes:
 	if ax is None:
 		fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -70,11 +86,7 @@ def map_arctic_value(df, name=None, **snskwargs):
 	ax.legend(markerscale=2)
 	fig.tight_layout()
 
-	logger.info("Saving")
-	plt.savefig(os.path.join(get_plot_dir(), f"map_{name}.png"))
-	logger.info("Done")
-	logger.info("Showing")
-	plt.show()
+	save_and_show(filename=f"map_{name}.png")
 
 
 def map_itps(itps_metadata):
@@ -99,10 +111,7 @@ def map_itps(itps_metadata):
 	g.legend_.remove()
 	plt.legend([], [], frameon=False)
 
-	logger.info("Saving to file")
-	plt.savefig(os.path.join(get_plot_dir(), "itps_map.png"))
-
-	plt.show()
+	save_and_show("itps_map.png")
 
 
 def map_udash(udash):
@@ -129,31 +138,37 @@ def map_udash(udash):
 	g.legend_.remove()
 	plt.legend([], [], frameon=False, markersize=4)
 
-	logger.info("Saving to file")
-	plt.savefig(os.path.join(get_plot_dir(), "udash_map.png"))
-	plt.show()
+	save_and_show("udash_map.png")
+
+
+def plot_histogram(data: pd.DataFrame, x, discrete: bool = False, filename: str = "hist_plot.png"):
+	"""
+	Plot a histogram of the specified data.
+
+	Parameters
+	----------
+	data: DataFrame
+	x : vector or key
+	discrete : bool, optional
+	filename : str, optional
+	"""
+	logger.info(f"Plotting histogram for {x}")
+	sns.histplot(data, x=x, discrete=discrete)
+	save_and_show(filename, dpi=1000)
 
 
 def udash_depth_hist(udash):
-	logger.info("Plotting depth histogram")
-	sns.displot(udash, x="Depth_[m]")
-	plt.savefig(os.path.join(get_plot_dir(), "udash_depth_hist.png"), dpi=1000)
-	plt.show()
+	plot_histogram(udash, x="Depth_[m]", filename="udash_depth_hist.png")
 
 
 def udash_time_hist(udash):
-	logger.info("Plotting date hist")
-	sns.displot(udash, x="yyyy-mm-ddThh:mm")
-	plt.savefig(os.path.join(get_plot_dir(), "udash_time_hist.png"), dpi=1000)
-	plt.show()
+	plot_histogram(udash, x="yyyy-mm-ddThh:mm", filename="udash_time_hist.png")
 
 
 def udash_months_hist(udash):
-	logger.info("Plotting month hist")
 	udash_months = udash["yyyy-mm-ddThh:mm"].dt.month
-	sns.histplot(udash_months, discrete=True)
-	plt.savefig(os.path.join(get_plot_dir(), "udash_months_hist.png"), dpi=1000)
-	plt.show()
+	plot_histogram(udash, x=udash_months, filename="udash_months_hist.png")
+
 
 
 def time_hist(metadatas) -> None:
@@ -203,8 +218,7 @@ def all_spatial_old(metadata, udash, argos):
 		markers="h",
 	)
 
-	plt.savefig(os.path.join(get_plot_dir(), "all_spatial.png"), dpi=1000)
-	plt.show()
+	save_and_show("all_spatial.png", dpi=1000)
 
 
 def all_spatial_xr(itps: xr.Dataset, udash: xr.Dataset, argos: xr.Dataset):
@@ -238,8 +252,7 @@ def all_spatial_xr(itps: xr.Dataset, udash: xr.Dataset, argos: xr.Dataset):
 	)
 	plt.legend(title="Sources", markerscale=4)
 	plt.tight_layout()
-	plt.savefig(os.path.join(get_plot_dir(), "all_spatial.png"), dpi=1000)
-	plt.show()
+	save_and_show("all_spatial.png", dpi=1000)
 
 
 def all_time(metadata, udash: xr.Dataset, argos):
@@ -257,8 +270,7 @@ def all_time(metadata, udash: xr.Dataset, argos):
 	sns.displot(data=combined_df_drop, x="time", hue="source", discrete=True, kde=False, alpha=0.5)
 	plt.ylim(top=200)
 
-	plt.savefig(os.path.join(get_plot_dir(), "all_time.png"), dpi=1000)
-	plt.show()
+	save_and_show("all_time.png", dpi=1000)
 
 
 def plot_press(itp, udash, argos):
@@ -275,8 +287,7 @@ def plot_press(itp, udash, argos):
 
 	sns.histplot(data=combined_df, x="press", hue="source", discrete=True, kde=False, alpha=0.5)
 
-	plt.savefig(os.path.join(get_plot_dir(), "udash_press.png"), dpi=1000)
-	plt.show()
+	save_and_show("udash_press.png", dpi=1000)
 
 
 def plot_range_press(itp, udash, argos):
@@ -300,15 +311,13 @@ def plot_range_press(itp, udash, argos):
 	sns.histplot(data=combined_df, x="press_max", hue="source", binwidth=100, kde=False, alpha=0.5)
 	plt.yscale("symlog")
 	plt.title("Max pressure per profile")
-	plt.savefig(os.path.join(get_plot_dir(), "press_max.png"), dpi=1000)
-	plt.show()
+	save_and_show("press_max.png", dpi=1000)
 
 	sns.histplot(data=combined_df, x="press_min", hue="source", binwidth=5, kde=False, alpha=0.5)
 	plt.xlim(-10, 6000)
 	plt.yscale("symlog")
 	plt.title("Min pressure per profile")
-	plt.savefig(os.path.join(get_plot_dir(), "press_min.png"), dpi=1000)
-	plt.show()
+	save_and_show("press_min.png", dpi=1000)
 
 
 def t_s(itp, udash, argos):
@@ -337,12 +346,10 @@ def t_s(itp, udash, argos):
 	s_combined_df = ts_combined_df.drop_duplicates(["sal", "source"]).reset_index(drop=True)
 
 	sns.histplot(data=t_combined_df, x="temp", hue="source")
-	plt.savefig(os.path.join(get_plot_dir(), "all_temp.png"), dpi=1000)
-	plt.show()
+	save_and_show("all_temp.png", dpi=1000)
 
 	sns.histplot(data=s_combined_df, x="sal", hue="source")
-	plt.savefig(os.path.join(get_plot_dir(), "all_sal.png"), dpi=1000)
-	plt.show()
+	save_and_show("all_sal.png", dpi=1000)
 
 
 def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False) -> None:
@@ -412,8 +419,7 @@ def spatial_density(data: xr.Dataset, season: bool = False, decade: bool = False
 
 	# plt.tight_layout()
 	fig.suptitle("Histogram of the data density per season pre and post 2005", size=18)
-	plt.savefig(os.path.join(get_plot_dir(), f"spatial_density_season_2005_d{len(decades)}.png"), dpi=1000)
-	plt.show()
+	save_and_show(f"spatial_density_season_2005_d{len(decades)}.png", dpi=1000)
 
 
 def main():
