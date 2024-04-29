@@ -15,6 +15,11 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "isort",
+]
+
 [project.urls]
 Homepage = "https://github.com/SkirOwen/nereus"
 
