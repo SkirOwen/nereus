@@ -13,7 +13,7 @@ import pandas as pd
 import xarray as xr
 
 from rich.progress import Progress, TaskID
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from nereus import logger
 from nereus.utils.directories import get_argo_dir
@@ -115,7 +115,9 @@ def process_argo(
 		for i in range(argo.TIME.size):
 			if np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
 				continue
-			if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (len(argo.PRES[i]) <= 2):
+			if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
+				continue
+			if any([(np.count_nonzero(~np.isnan(argo[dim][i])) <= 2) for dim in dims if dim != "DOX2_ADJUSTED"]):
 				continue
 
 			interp_argo = {
@@ -166,13 +168,12 @@ def preload_argo(**kwargs) -> str:
 
 		if parallel:
 			with ProcessPoolExecutor(6) as executor:
-
 				partial_process = partial(
 					process_argo,
 					x_inter=x_inter,
 					dims=dims,
 					base_dim=base_dim,
-					task_tot = len(argos)
+					task_tot=len(argos),
 				)
 				futures = [executor.submit(partial_process, argo, task_num=i) for i, argo in enumerate(argos)]
 
