@@ -55,52 +55,6 @@ def load_all_argo() -> list:
 	return argos
 
 
-# def interp_argo(argo: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
-# 	x_inter = np.arange(10, 760, 10)
-#
-# 	# time = argo.time[i].data
-# 	# lat = argo.lat[i].data
-# 	# lon = argo.longitude[i].data
-#
-# 	interp_udash = {
-# 		"profile":  np.full(x_inter.shape, argo["profile"].values[0]),  # So everything has the same length
-# 		"cruise":   np.full(x_inter.shape, argo["cruise"].values[0]),
-# 		"time":     np.full(x_inter.shape, argo.TIME.values[0]),
-# 		"lat":      np.full(x_inter.shape, argo.["lat"].values[0]),
-# 		"lon":      np.full(x_inter.shape, argo.["lon"].values[0]),
-# 		"source":   np.full(x_inter.shape, argo.["source"].values[0]),
-# 		base_dim:   x_inter
-# 	}
-#
-# 	for dim in dims:
-# 		if dim in argo:
-# 			argo[dim] = np.interp(x_inter, argo[base_dim].values, argo[dim].values)
-# 		else:
-# 			argo[dim] = np.full(x_inter.shape, np.nan)
-# 	return pd.DataFrame(argo)
-
-
-# def clean_argo(argo: xr.Dataset):
-# 	argo = argo.drop_dims("POSITION")
-# 	argo = argo.drop_vars(
-# 		[
-# 			"TIME_QC",
-# 			"DC_REFERENCE",
-# 			"DIRECTION",
-# 			"VERTICAL_SAMPLING_SCHEME",
-# 			"PRES_QC",
-# 			"PRES_ADJUSTED",
-# 			"PRES_ADJUSTED_QC",
-# 			"TEMP_QC",
-# 			"TEMP_ADJUSTED",
-# 			"TEMP_ADJUSTED_QC",
-# 			"PSAL_QC",
-# 			"PSAL_ADJUSTED",
-# 			"PSAL_ADJUSTED_QC",
-# 		]
-# 	)
-
-
 def process_argo(
 		argo: xr.Dataset,
 		x_inter: np.ndarray = np.arange(10, 760, 10),
