@@ -44,10 +44,9 @@ def extract_argo() -> None:
 
 
 def load_all_argo() -> list:
-	all_argo = [
-		f for f in os.listdir(get_argo_dir())
-		if f.endswith(".nc")
-	]
+	all_argo = glob.glob(
+		os.path.join(get_argo_dir(), "GL_*.nc")
+	)
 
 	argos = []
 	for f in tqdm(all_argo, desc="Opening Argos"):
@@ -65,31 +64,31 @@ def process_argo(
 	) -> list:
 	""""""
 	processed_argo = []
-	with tqdm(total=argo.TIME.size, desc=f"(Task {task_num} / {task_tot}) Process date", position=1, leave=False) as pbar:
-		for i in range(argo.TIME.size):
-			if np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
-				continue
-			if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
-				continue
-			if any([(np.count_nonzero(~np.isnan(argo[dim][i])) <= 2) for dim in dims if dim != "DOX2_ADJUSTED"]):
-				continue
+	for i in tqdm(range(argo.TIME.size), desc=f"(Task {task_num} / {task_tot}) Process date", position=task_num % 6, leave=False):
+		if not np.all([dim in argo.data_vars for dim in dims if dim != "DOX2_ADJUSTED"]):
+			# TODO: Should this be only for TEMP and SAL?
+			continue
+		if np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
+			continue
+		if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
+			continue
+		if any([(np.count_nonzero(~np.isnan(argo[dim][i])) <= 2) for dim in dims if dim != "DOX2_ADJUSTED"]):
+			continue
 
-			interp_argo = {
-				"time": np.full(x_inter.shape, argo.TIME[i].data),
-				"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
-				"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
-				"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
-				base_dim: x_inter,
-			}
+		interp_argo = {
+			"time": np.full(x_inter.shape, argo.TIME[i].data),
+			"lat": np.full(x_inter.shape, argo.LATITUDE[i].data),
+			"lon": np.full(x_inter.shape, argo.LONGITUDE[i].data),
+			"profile": np.full(x_inter.shape, f"argo_{argo.id}_{i}"),
+			base_dim: x_inter,
+		}
 
-			for dim in dims:
-				if dim in argo:
-					interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
-				else:
-					interp_argo[dim] = np.full(x_inter.shape, np.nan)
-			processed_argo.append(pd.DataFrame(interp_argo))
-			pbar.update(1)
-		pbar.close()
+		for dim in dims:
+			if dim in argo:
+				interp_argo[dim] = np.interp(x_inter, argo[base_dim][i].data, argo[dim][i].data)
+			else:
+				interp_argo[dim] = np.full(x_inter.shape, np.nan)
+		processed_argo.append(pd.DataFrame(interp_argo))
 
 	return processed_argo
 
@@ -132,12 +131,15 @@ def preload_argo(**kwargs) -> str:
 				futures = [executor.submit(partial_process, argo, task_num=i) for i, argo in enumerate(argos)]
 
 				for future in tqdm(futures, desc="Processing argos", position=0):
-					processed_argos.extend(future.result())
+					result = future.result()
+					# if result is not None:
+					processed_argos.extend(result)
 
 		else:
 			for argo in tqdm(argos):
 				processed_argo = process_argo(argo, x_inter, base_dim, dims)
-				processed_argos.extend(processed_argo)
+				if processed_argo is not None:
+					processed_argos.extend(processed_argo)
 
 		logger.info("Concat")
 		argos = pd.concat(processed_argos, ignore_index=True)
