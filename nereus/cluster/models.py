@@ -19,6 +19,7 @@ import nereus
 import nereus.datasets
 
 from nereus import logger
+from nereus.plots.plots import map_arctic_value
 from nereus.utils.directories import get_data_dir, get_plot_dir
 
 
@@ -219,12 +220,14 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
-	data_full = nereus.datasets.load_data().load()
-	ds_full = _clean_data(data_full)
+	ds_full = nereus.datasets.load_data().load()
+	ds_full = ds_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	# ds_full = _clean_data(ds_full)
 
 	logger.info("Loading train data")
-	data = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
-	ds = _clean_data(data)
+	ds = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
+	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	# ds = _clean_data(ds)
 
 	scaler_temp = get_scaler(ds_full["temp"].values)
 	scaler_sal = get_scaler(ds_full["sal"].values)
@@ -260,7 +263,7 @@ def _clean_data(ds, ):
 			ds.sel(pres=slice(350, None)).sal < 27,
 		), drop=True
 	)
-	ds = ds.drop_sel(profile=drop_ds.profile)
+	ds = ds.drop_sel(profile=drop_ds.profile, errors="ignore")
 	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
 	return ds
 
@@ -280,13 +283,13 @@ def main():
 	n_gmm = 4
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
 	plot_mean_profile_allinone(ds_full, cmap=colour_palette)
-	# map_arctic_value(
-	# 	ds_full.to_dataframe(),
-	# 	name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
-	# 	hue="label",
-	# 	s=5,
-	# 	palette=colour_palette
-	# )
+	map_arctic_value(
+		ds_full.to_dataframe(),
+		name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+		hue="label",
+		s=5,
+		palette=colour_palette
+	)
 
 
 if __name__ == "__main__":
