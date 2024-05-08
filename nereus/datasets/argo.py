@@ -103,11 +103,7 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 	return ds
 
 
-def preload_argo(**kwargs) -> str:
-	# check download
-	# parse
-	parallel = True
-
+def preload_argo(parallel: bool = True, **kwargs) -> str:
 	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
 
 	if not os.path.exists(save_path):
@@ -136,8 +132,8 @@ def preload_argo(**kwargs) -> str:
 					processed_argos.extend(result)
 
 		else:
-			for argo in tqdm(argos):
-				processed_argo = process_argo(argo, x_inter, base_dim, dims)
+			for i, argo in enumerate(tqdm(argos)):
+				processed_argo = process_argo(argo, x_inter, base_dim, dims, task_tot=len(argo), task_num=i)
 				if processed_argo is not None:
 					processed_argos.extend(processed_argo)
 
