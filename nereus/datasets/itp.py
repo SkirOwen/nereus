@@ -476,12 +476,14 @@ def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
 	return ds
 
 
-def preload_itp(clean_df=True, **kwargs):
+def preload_itp(clean_df=True, regen: bool = False, **kwargs):
 	# check download
 	# parse
 	save_path = os.path.join(get_itp_cache_dir(), "itps_xr.nc")
-	if not os.path.exists(save_path):
-		if not os.path.exists(os.path.join(get_itp_dir(), "itps_preprocessed.parquet")):
+
+	if not os.path.exists(save_path) or regen:
+		parquet_cache = os.path.join(get_itp_cache_dir(), "itps_preprocessed.parquet")
+		if not os.path.exists(parquet_cache) or regen:
 			itps, metadatas = parser_all_itp(**kwargs)
 			logger.info("Parsed")
 			processed_itps = []
@@ -504,9 +506,9 @@ def preload_itp(clean_df=True, **kwargs):
 				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
 
 			logger.info("Caching")
-			df_itps.to_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+			df_itps.to_parquet(parquet_cache)
 		else:
-			df_itps = pd.read_parquet(os.path.join(get_itp_dir(), "itps_preprocessed.parquet"))
+			df_itps = pd.read_parquet(parquet_cache)
 
 		logger.info("Converting to xarray")
 		ds = itps_to_xr(df_itps)
@@ -523,15 +525,13 @@ def preload_itp(clean_df=True, **kwargs):
 
 
 def main():
-	# itps_path = preload_itp(
-	# 	dims=["temperature(C)", "salinity", "dissolved_oxygen(umol/kg)"],
-	# 	base_dim="pressure(dbar)",
-	# 	x_inter=None
-	# )
+	preload_itp(
+
+	)
 	# print(itps_path)
-	meta, itp = parser_all_itp(filtering=False)
-	print(len(meta))
-	print(len(itp))
+	# meta, itp = parser_all_itp(filtering=False)
+	# print(len(meta))
+	# print(len(itp))
 
 
 if __name__ == "__main__":
