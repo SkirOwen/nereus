@@ -278,6 +278,7 @@ def itp_parser(
 		nbr_filter: int = 2,
 		low_filter: float = 10.0,
 		high_filter: float = 750.0,
+		**kwargs
 ) -> tuple[pd.DataFrame, dict] | None:
 	"""
 	Parse data from an ITP file.
@@ -453,7 +454,7 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 	x_inter = np.arange(10, 760, 10)
 	interp_itp = {
-		"file": np.full(x_inter, itp["file"].values[0]),  # So everything has the same length
+		"file": itp["file"].values[: len(x_inter)],  # So everything has the same length
 		base_dim: x_inter,
 	}
 
@@ -526,7 +527,7 @@ def preload_itp(clean_df=True, regen: bool = False, **kwargs):
 
 def main():
 	preload_itp(
-
+		dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres"
 	)
 	# print(itps_path)
 	# meta, itp = parser_all_itp(filtering=False)
