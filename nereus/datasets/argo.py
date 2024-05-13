@@ -64,11 +64,11 @@ def process_argo(
 	) -> list:
 	""""""
 	processed_argo = []
-	for i in tqdm(range(argo.TIME.size), desc=f"(Task {task_num} / {task_tot}) Process date", position=task_num % 6, leave=False):
+	for i in tqdm(range(argo.TIME.size), desc=f"(Task {task_num} / {task_tot}) Process date", position=task_num % 6 + 1, leave=False):
 		if not np.all([dim in argo.data_vars for dim in dims if dim != "DOX2_ADJUSTED"]):
 			# TODO: Should this be only for TEMP and SAL?
 			continue
-		if np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
+		if not np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
 			continue
 		if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
 			continue
@@ -103,48 +103,52 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 	return ds
 
 
-def preload_argo(parallel: bool = True, **kwargs) -> str:
+def preload_argo(parallel: bool = True, regen: bool = False, **kwargs) -> str:
 	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
 
-	if not os.path.exists(save_path):
-		argos = load_all_argo()
-		logger.info("Argo Loaded")
-		processed_argos = []
+	if not os.path.exists(save_path) or regen:
+		cache_path = os.path.join(get_argo_dir(), "argos_preprocessed.parquet")
+		if not os.path.exists(cache_path) or regen:
+			argos = load_all_argo()
+			logger.info("Argo Loaded")
+			processed_argos = []
 
-		x_inter = np.arange(10, 760, 10)
-		base_dim = "PRES"
-		dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
+			x_inter = np.arange(10, 760, 10)
+			base_dim = "PRES"
+			dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
 
-		if parallel:
-			with ProcessPoolExecutor(6) as executor:
-				partial_process = partial(
-					process_argo,
-					x_inter=x_inter,
-					dims=dims,
-					base_dim=base_dim,
-					task_tot=len(argos),
-				)
-				futures = [executor.submit(partial_process, argo, task_num=i) for i, argo in enumerate(argos)]
+			if parallel:
+				with ProcessPoolExecutor(6) as executor:
+					partial_process = partial(
+						process_argo,
+						x_inter=x_inter,
+						dims=dims,
+						base_dim=base_dim,
+						task_tot=len(argos),
+					)
+					futures = [executor.submit(partial_process, argo, task_num=i) for i, argo in enumerate(argos)]
 
-				for future in tqdm(futures, desc="Processing argos", position=0):
-					result = future.result()
-					# if result is not None:
-					processed_argos.extend(result)
+					for future in tqdm(futures, desc="Processing argos", position=0):
+						result = future.result()
+						# if result is not None:
+						processed_argos.extend(result)
 
+			else:
+				for i, argo in enumerate(tqdm(argos)):
+					processed_argo = process_argo(argo, x_inter, base_dim, dims, task_tot=len(argo), task_num=i)
+					if processed_argo is not None:
+						processed_argos.extend(processed_argo)
+
+			logger.info("Concat")
+			argos = pd.concat(processed_argos, ignore_index=True)
+
+			logger.info("Rename")
+			argos.rename(columns=RENAME_COL, inplace=True)
+
+			logger.info("Caching")
+			argos.to_parquet(cache_path)
 		else:
-			for i, argo in enumerate(tqdm(argos)):
-				processed_argo = process_argo(argo, x_inter, base_dim, dims, task_tot=len(argo), task_num=i)
-				if processed_argo is not None:
-					processed_argos.extend(processed_argo)
-
-		logger.info("Concat")
-		argos = pd.concat(processed_argos, ignore_index=True)
-
-		logger.info("Rename")
-		argos.rename(columns=RENAME_COL, inplace=True)
-
-		logger.info("Caching")
-		argos.to_parquet(os.path.join(get_argo_dir(), "argos_preprocessed.parquet"))
+			argos = pd.read_parquet(cache_path)
 
 		logger.info("Converting to xarray")
 		ds = argos_to_xr(argos)
@@ -161,7 +165,7 @@ def preload_argo(parallel: bool = True, **kwargs) -> str:
 
 
 def main():
-	preload_argo()
+	preload_argo(regen=True)
 
 
 if __name__ == "__main__":
