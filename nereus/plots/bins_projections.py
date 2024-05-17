@@ -155,7 +155,7 @@ def interactive(data):
 		label="x",
 		valmin=0,
 		valmax=500_000,
-		valinit=10_000,
+		valinit=100_000,
 		valstep=10_000,
 		orientation="vertical",
 	)
@@ -164,7 +164,7 @@ def interactive(data):
 		label="y",
 		valmin=0,
 		valmax=500_000,
-		valinit=10_000,
+		valinit=100_000,
 		valstep=10_000,
 		orientation="vertical",
 	)
