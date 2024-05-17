@@ -176,6 +176,7 @@ def ramdon_sample_by_month(
 		selected_size_monthly = smallest_month_size
 		print(f"Ratio is too large, selected_size_monthly is reset to the smallest_month_size: {smallest_month_size}")
 
+	logger.info("concat")
 	ds_selected = xr.concat(
 		[ds_monthly[month].isel(
 			profile=np.random.default_rng(random_seed).choice(
