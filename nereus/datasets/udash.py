@@ -244,8 +244,12 @@ def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
 	udash.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(udash)
-	for coord in ["lat", "lon", "time", "cruise", "source"]:
-		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
+	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time", "cruise", "source"])
+	ds = xr.merge([ds.drop_vars(['lon', 'cruise', 'lat', 'source', 'time']), co_ds])
+
+	#
+	# for coord in ["lat", "lon", "time", "cruise", "source"]:
+	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
@@ -261,8 +265,10 @@ def preload_udash(**kwargs) -> str:
 			processed_udash = []
 
 			for i, u in tqdm(udash.groupby("profile")):
-				new_u = interp_udash(u, **kwargs)
-				processed_udash.append(new_u)
+				if all([u[dim].isna().sum() == 0 for dim in ["temp", "sal"]]):
+
+					new_u = interp_udash(u, **kwargs)
+					processed_udash.append(new_u)
 
 			logger.info("Concat")
 			udash = pd.concat(processed_udash, ignore_index=True)

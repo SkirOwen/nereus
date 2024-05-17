@@ -467,13 +467,16 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-	unique_coords = df_itps.drop_duplicates("file").set_index("file")[["lat", "lon", "time"]]
 	df_itps.rename(columns={"file": "profile"}, inplace=True)
+	unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
 	df_itps.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(df_itps)
-	for coord in ["lat", "lon", "time"]:
-		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
+	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
+	ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
+
+	# for coord in ["lat", "lon", "time"]:
+	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
