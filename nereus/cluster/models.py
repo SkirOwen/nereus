@@ -178,6 +178,9 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 
 	for i in range(num_classes):
 		ds_class = ds_fit.where(ds_fit.label == i, drop=True)
+		if len(ds_class.profile) == 0:
+			logger.warning("Skipping a class, make sure your training data is representative of your the entire dataset")
+			continue
 
 		qua5_temp = np.quantile(ds_class["temp"], 0.05, axis=0)
 		qua95_temp = np.quantile(ds_class["temp"], 0.95, axis=0)
@@ -221,13 +224,13 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 def run(benchmark, n_pc, n_gmm):
 	logger.info("Loading full data")
 	ds_full = nereus.datasets.load_data().load()
-	# ds_full = ds_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
-	ds_full = _clean_data(ds_full)
+	ds_full = ds_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	# ds_full = _clean_data(ds_full)
 
 	logger.info("Loading train data")
-	ds = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_10000_10000.nc")).load()
-	# ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
-	ds = _clean_data(ds)
+	ds = xr.open_dataset(os.path.join(get_data_dir(), "train_ds_100000_100000.nc")).load()
+	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
+	# ds = _clean_data(ds)
 
 	scaler_temp = get_scaler(ds_full["temp"].values)
 	scaler_sal = get_scaler(ds_full["sal"].values)
@@ -278,16 +281,17 @@ def main():
 	]
 
 	n_pc = 2
-	n_gmm = 4
+	n_gmm = 6
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
+
 	plot_mean_profile_allinone(ds_full, cmap=colour_palette)
-	# map_arctic_value(
-	# 	ds_full.to_dataframe(),
-	# 	name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
-	# 	hue="label",
-	# 	s=5,
-	# 	palette=colour_palette
-	# )
+	map_arctic_value(
+		ds_full.to_dataframe(),
+		name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+		hue="label",
+		s=5,
+		palette=colour_palette
+	)
 
 
 if __name__ == "__main__":
