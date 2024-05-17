@@ -115,6 +115,7 @@ def _udash_fileparser(
 			data[key].append(v)
 
 	data = pd.DataFrame(data)
+	data = process_quality_checks(data)
 	# logger.info("Clean")
 	data = clean_df_udash(data)
 
@@ -194,6 +195,18 @@ def parse_all_udash(files_nbr: None | int = None, **kwargs) -> pd.DataFrame:
 def filter_groups(group, dim, low, high, min_nobs):
 	mask = group[dim].max() >= high and group[dim].min() <= low and len(group[dim]) > min_nobs
 	return mask
+
+
+def process_quality_checks(udash):
+	logger.debug("Process quality checks")
+	qfs = ["QF_Depth_[m]", "QF_Temp_[C]", "QF_Salinity_[psu]"]
+
+	udash = udash[(
+			(udash["QF_Depth_[m]"] == "0") &
+			(udash["QF_Temp_[C]"] == "0") &
+			(udash["QF_Salinity_[psu]"] == "0")
+	)]
+	return udash
 
 
 def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
