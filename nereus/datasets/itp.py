@@ -73,7 +73,8 @@ RENAME_COL = {
 	"longitude(e+)": "lon",
 	"latitude(n+)": "lat",
 	# 'ndepths',
-	# 'time'
+	# 'time',
+	"profile": "profile_nbr"
 }
 
 
@@ -454,7 +455,7 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 	x_inter = np.arange(10, 760, 10)
 	interp_itp = {
-		"file": itp["file"].values[: len(x_inter)],  # So everything has the same length
+		"profile": itp["file"].values[: len(x_inter)],  # So everything has the same length
 		base_dim: x_inter,
 	}
 
@@ -467,7 +468,7 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-	df_itps.rename(columns={"file": "profile"}, inplace=True)
+	# df_itps.rename(columns={"file": "profile"}, inplace=True)
 	unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
 	df_itps.set_index(["profile", "pres"], inplace=True)
 
@@ -493,21 +494,24 @@ def preload_itp(clean_df=True, regen: bool = False, **kwargs):
 			processed_itps = []
 
 			for itp in tqdm(itps):
+				itp.rename(columns=RENAME_COL, inplace=True)
 				new_itp = interp_itps(itp, **kwargs)
 				processed_itps.append(new_itp)
 
 			logger.info("Concat")
+			metadatas.index.names = ['profile']
+			metadatas.rename(columns=RENAME_COL, inplace=True)
 			df_itps = pd.concat(
-				processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("file").to_list()
+				processed_itps, ignore_index=True, keys=metadatas.index.get_level_values("profile").to_list()
 			)
 
 			logger.info("Join")
-			df_itps = df_itps.join(metadatas, on="file")
+			df_itps = df_itps.join(metadatas, on="profile")
 
-			df_itps.rename(columns=RENAME_COL, inplace=True)
+			# df_itps.rename(columns=RENAME_COL, inplace=True)
 			if clean_df:
 				logger.info("Clean df")
-				df_itps.drop(["source", "year", "day", "profile", "itp"], axis=1, inplace=True)
+				df_itps.drop(["source", "year", "day", "profile_nbr", "itp"], axis=1, inplace=True)
 
 			logger.info("Caching")
 			df_itps.to_parquet(parquet_cache)
@@ -530,7 +534,7 @@ def preload_itp(clean_df=True, regen: bool = False, **kwargs):
 
 def main():
 	preload_itp(
-		dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres"
+		dims=["temp", "sal", "depth", "dis_oxy"], x_inter=None, base_dim="pres"
 	)
 	# print(itps_path)
 	# meta, itp = parser_all_itp(filtering=False)
