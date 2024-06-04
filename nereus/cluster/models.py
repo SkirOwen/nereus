@@ -278,20 +278,21 @@ def main():
 		"#44aa99",  # tesl blue         blue-green
 		"#882255",  # dark magenta     red purple
 		"#332288",  # deep blue        dark royal blue
+		"#aa4499",  # purple
 	]
 
-	n_pc = 2
-	n_gmm = 6
+	n_pc = 3
+	n_gmm = 3
 	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
 
 	plot_mean_profile_allinone(ds_full, cmap=colour_palette)
-	map_arctic_value(
-		ds_full.to_dataframe(),
-		name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
-		hue="label",
-		s=5,
-		palette=colour_palette
-	)
+	# map_arctic_value(
+	# 	ds_full.to_dataframe(),
+	# 	name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+	# 	hue="label",
+	# 	s=5,
+	# 	palette=colour_palette
+	# )
 
 
 if __name__ == "__main__":
