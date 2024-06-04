@@ -8,6 +8,7 @@ from nereus.datasets.argo import preload_argo
 from nereus.datasets.itp import preload_itp
 from nereus.datasets.udash import preload_udash
 from nereus.utils.file_ops import create_cache_filename
+from nereus.utils.directories import get_data_dir
 
 
 def format_merged(ds, **kwargs) -> xr.Dataset:
@@ -25,13 +26,14 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 
 	ds = format_merged(ds, **kwargs)
 
-	# if kwargs["save"]:
+	if kwargs["save"]:
 	# 	cache_path = create_cache_filename(name="merged", **kwargs)
-	# 	ds.to_netcdf(
-	# 		cache_path,
-	# 		format="NETCDF4",
-	# 		engine="h5netcdf",
-	# 	)
+		cache_path = os.path.join(get_data_dir(), "test.nc")
+		ds.to_netcdf(
+			cache_path,
+			format="NETCDF4",
+			engine="h5netcdf",
+		)
 	return ds
 
 
@@ -40,12 +42,12 @@ def load_data(**kwargs) -> xr.Dataset:
 	if os.path.exists(cache_file):
 		ds = xr.open_dataset(cache_file)
 	else:
-		ds = regen_all_datasets(**kwargs)
+		ds = regen_all_datasets(save=False, **kwargs)
 	return ds
 
 
 def main():
-	load_data()
+	load_data(save=True)
 
 
 if __name__ == "__main__":
