@@ -2,6 +2,9 @@ import importlib
 import inspect
 import os
 
+from rich.console import Console
+console = Console()
+
 
 def get_nereus_dir() -> str:
 	rdp_module = importlib.import_module("nereus")
