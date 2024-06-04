@@ -8,7 +8,7 @@ from nereus.config import get_nereus_dir
 
 
 CACHE_MAPPING = os.path.join(get_nereus_dir(), "nereus", "cache_mapping")
-
+# TODO: guarantee existence of the CACHE_MAPPING
 
 def guarantee_existence(path: str) -> str:
 	"""Function to guarantee the existence of a path, and returns its absolute path.
@@ -50,14 +50,16 @@ def calculate_md5(file_path: str) -> str:
 
 
 def create_cache_filename(name: str, **kwargs) -> str:
-	combined_string = f"{name}_".join(f"{key}={value}" for key, value in kwargs.items())
+	combined_string = f"{name}_" + "_".join(f"{key}={value}" for key, value in kwargs.items())
 
 	hash_object = hashlib.md5(combined_string.encode())
 	hash_string = hash_object.hexdigest()
 
-	# Save the mapping
-	with open(CACHE_MAPPING, "a", encoding="utf-8") as file:
-		file.write(json.dumps({hash_string: kwargs}) + "\n")
+	# Check if the hash already exists in the cache mapping file
+	if retrieve_processing_info(hash_string) is None:
+		# Save the mapping
+		with open(CACHE_MAPPING, "a", encoding="utf-8") as file:
+			file.write(json.dumps({hash_string: kwargs}) + "\n")
 
 	return f"name_{hash_string}"
 
