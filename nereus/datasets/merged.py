@@ -11,10 +11,6 @@ from nereus.utils.file_ops import create_cache_filename
 from nereus.utils.directories import get_data_dir
 
 
-def format_merged(ds, **kwargs) -> xr.Dataset:
-	return ds
-
-
 def regen_all_datasets(**kwargs) -> xr.Dataset:
 	# This would return the path of the cache file, to preserve memory
 	# And if I want or system can, this could be async/parallel
@@ -23,8 +19,6 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 	argo_file: str = preload_argo(**kwargs)
 
 	ds = xr.open_mfdataset([itps_file, udash_file, argo_file], chunks="auto", parallel=True)
-
-	ds = format_merged(ds, **kwargs)
 
 	if kwargs["save"]:
 	# 	cache_path = create_cache_filename(name="merged", **kwargs)
