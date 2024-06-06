@@ -244,12 +244,10 @@ def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
 	return convert_to_xr(udash, coords=['lon', 'cruise', 'lat', 'source', 'time'])
 
 
-
-def preload_udash(**kwargs) -> str:
-	# check download
-	# parse
+def preload_udash(regen: bool = False, **kwargs) -> str:
 	save_path = os.path.join(get_udash_dir(), "udash_xr.nc")
-	if not os.path.exists(save_path):
+
+	if not os.path.exists(save_path) or regen:
 		if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
 			udash = parse_all_udash()
 			udash.rename(columns=rename_col, inplace=True)

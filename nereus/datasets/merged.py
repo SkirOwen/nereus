@@ -31,12 +31,12 @@ def regen_all_datasets(**kwargs) -> xr.Dataset:
 	return ds
 
 
-def load_data(**kwargs) -> xr.Dataset:
+def load_data(regen: bool = False, **kwargs) -> xr.Dataset:
 	cache_file = create_cache_filename(name="merged", **kwargs)
-	if os.path.exists(cache_file):
+	if os.path.exists(cache_file) and not regen:
 		ds = xr.open_dataset(cache_file)
 	else:
-		ds = regen_all_datasets(save=False, **kwargs)
+		ds = regen_all_datasets(save=False, regen=regen, **kwargs)
 	return ds
 
 
