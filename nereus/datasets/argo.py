@@ -101,8 +101,10 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 	argos.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(argos)
-	for coord in ["lat", "lon", "time"]:
-		ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
+	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
+	ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
+	# for coord in ["lat", "lon", "time"]:
+	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
