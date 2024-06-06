@@ -112,6 +112,24 @@ def get_proj(val):
 	return proj
 
 
+def get_train_data(data):
+	x_step_start = 100_000
+	y_step_start = 100_000
+
+	# fig, ax1, ax2, g, line = map_groups_proj(latlon_groups, proj=ccrs.NorthPolarStereo())
+	latlon_groups = grid_bin_coord(data, ccrs.NorthPolarStereo(), x_step_start, y_step_start)
+	ds_train = prepare_training_data(
+		x_step_start, y_step_start, quantile4T=0.95, ds_cleaned=data, proj=ccrs.NorthPolarStereo()
+	)
+
+	ds_train.to_netcdf(
+		os.path.join(get_data_dir(), f"train_ds_{x_step_start}_{y_step_start}.nc"),
+		format="NETCDF4",
+		engine="h5netcdf",
+	)
+	logger.info("Saved")
+
+
 def interactive(data):
 	fig = plt.figure(figsize=(8, 8), dpi=300)
 	gs = GridSpec(2, 3, figure=fig)
