@@ -64,13 +64,16 @@ def process_argo(
 	) -> list:
 	""""""
 	processed_argo = []
+	min_pres = min(x_inter)
+	max_pres = max(x_inter)
+
 	for i in tqdm(range(argo.TIME.size), desc=f"(Task {task_num} / {task_tot}) Process date", position=task_num % 6 + 1, leave=False):
 		if not np.all([dim in argo.data_vars for dim in dims if dim != "DOX2_ADJUSTED"]):
 			# TODO: Should this be only for TEMP and SAL?
 			continue
 		if not np.all(np.diff(argo.PRES[i]) > 0):  # Making sure no NaNs in the pressure and strictly increasing
 			continue
-		if (argo.PRES[i].min() > 10.0) | (argo.PRES[i].max() < 750.0) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
+		if (argo.PRES[i].min() > min_pres) | (argo.PRES[i].max() < max_pres) | (np.count_nonzero(~np.isnan(argo.PRES[i])) <= 2):
 			continue
 		if any([(np.count_nonzero(~np.isnan(argo[dim][i])) <= 2) for dim in dims if dim != "DOX2_ADJUSTED"]):
 			continue
@@ -103,7 +106,7 @@ def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
 	return ds
 
 
-def preload_argo(parallel: bool = True, regen: bool = False, **kwargs) -> str:
+def preload_argo(parallel: bool = True, regen: bool = False, low_filter: int = 10, high_filter: int = 750, **kwargs) -> str:
 	save_path = os.path.join(get_argo_dir(), "argos_xr.nc")
 
 	if not os.path.exists(save_path) or regen:
@@ -113,7 +116,7 @@ def preload_argo(parallel: bool = True, regen: bool = False, **kwargs) -> str:
 			logger.info("Argo Loaded")
 			processed_argos = []
 
-			x_inter = np.arange(10, 760, 10)
+			x_inter = np.arange(low_filter, high_filter + 10, 10)
 			base_dim = "PRES"
 			dims = ["TEMP", "PSAL", "DOX2_ADJUSTED"]
 
