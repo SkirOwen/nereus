@@ -398,57 +398,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	return itps, metadata
 
 
-# def itps_to_df(save_df: bool = True, regenerate: bool = False):
-# 	""""""
-# 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
-# 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
-#
-# 	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
-#
-# 	# TODO: backend option to choose pandas vs polars
-# 	if regenerate or not cache_exist:
-# 		itps, metadatas = parser_all_itp()
-#
-# 		df_metadatas = pl.DataFrame(metadatas)
-# 		logger.info("Converting ITPs to dataframe")
-# 		df_itps = pl.concat([pl.DataFrame(itp) for itp in tqdm(itps, desc="Itps")], how="diagonal")
-# 		if save_df:
-# 			logger.info("Saving to file")
-# 			df_itps.write_parquet(itps_filepath)
-# 			df_metadatas.write_csv(metadata_filepath)
-#
-# 	else:
-# 		df_itps = pd.read_parquet(itps_filepath)
-# 		df_metadatas = pd.read_csv(metadata_filepath)
-#
-# 	return df_itps, df_metadatas
-
-
-# def load_itp(regenerate: bool = False, join: bool = False):
-# 	itps_filepath = os.path.join(get_itp_dir(), "itps.parquet")
-# 	metadata_filepath = os.path.join(get_itp_dir(), "metadata.csv")
-#
-# 	cache_exist = os.path.exists(itps_filepath) and os.path.exists(metadata_filepath)
-#
-# 	if regenerate or not cache_exist:
-# 		itps_to_df()
-#
-# 	df_itps = pd.read_parquet(itps_filepath)
-# 	df_metadatas = pd.read_csv(metadata_filepath)
-# 	if join:
-# 		df_metadatas = df_metadatas.set_index("file")
-# 		return df_itps.join(df_metadatas, on="file")
-# 	else:
-# 		return df_itps, df_metadatas
-
-
 def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
-	# This will take dims as y for interpolation
-	# such as dims = f(base_dim)
-	# then take x_inter, a range of point on which to interpolate
-	# it will return?? a dict? a new df?
-	# if it returns a df, should the input be a df?
-	# Handle NaNs
 	# Can remove the nans.
 	# or just quickly to pd interp?
 	# That could be a parameter
@@ -468,16 +418,12 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-	# df_itps.rename(columns={"file": "profile"}, inplace=True)
 	unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
 	df_itps.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(df_itps)
 	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
 	ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
-
-	# for coord in ["lat", "lon", "time"]:
-	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
