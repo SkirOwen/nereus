@@ -42,3 +42,8 @@ def get_argo_dir() -> str:
 def get_plot_dir() -> str:
 	"""./plots"""
 	return guarantee_existence(os.path.join(get_nereus_dir(), "plots"))
+
+
+def get_log_dir() -> str:
+	"""./logs"""
+	return guarantee_existence(os.path.join(get_nereus_dir(), "logs"))
