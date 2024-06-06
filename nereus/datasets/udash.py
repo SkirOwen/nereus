@@ -18,6 +18,7 @@ from tqdm import tqdm
 from nereus import logger
 from nereus.utils.directories import get_udash_dir, get_udash_extracted_dir
 from nereus.utils.downloader import downloader
+from nereus.datasets.data_utils import convert_to_xr
 
 
 URL = "https://hs.pangaea.de/Projects/UDASH/UDASH.zip"
@@ -210,13 +211,6 @@ def process_quality_checks(udash):
 
 
 def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
-	# This will take dims as y for interpolation
-	# such as dims = f(base_dim)
-	# then take x_inter, a range of point on which to interpolate
-	# it will return?? a dict? a new df?
-	# if it returns a df, should the input be a df?
-	# Handle NaNs
-	# Can remove the nans.
 	# or just quickly to pd interp?
 	# That could be a parameter
 
@@ -239,14 +233,16 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -
 	return pd.DataFrame(interp_udash_dict)
 
 
-def udash_to_xr(udash: pd.DataFrame, coords) -> xr.Dataset:
-	unique_coords = udash.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time", "cruise", "source"]]
-	udash.set_index(["profile", "pres"], inplace=True)
+def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
+	# unique_coords = udash.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time", "cruise", "source"]]
+	# udash.set_index(["profile", "pres"], inplace=True)
+	#
+	# ds = xr.Dataset.from_dataframe(udash)
+	# co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time", "cruise", "source"])
+	# ds = xr.merge([ds.drop_vars(['lon', 'cruise', 'lat', 'source', 'time']), co_ds])
+	# return ds
+	return convert_to_xr(udash, coords=['lon', 'cruise', 'lat', 'source', 'time'])
 
-	ds = xr.Dataset.from_dataframe(udash)
-	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time", "cruise", "source"])
-	ds = xr.merge([ds.drop_vars(['lon', 'cruise', 'lat', 'source', 'time']), co_ds])
-	return ds
 
 
 def preload_udash(**kwargs) -> str:

@@ -17,6 +17,7 @@ from tqdm.auto import tqdm
 
 from nereus import logger
 from nereus.utils.directories import get_argo_dir
+from nereus.datasets.data_utils import convert_to_xr
 
 
 URL = "https://data-argo.ifremer.fr"
@@ -97,15 +98,16 @@ def process_argo(
 
 
 def argos_to_xr(argos: pd.DataFrame) -> xr.Dataset:
-	unique_coords = argos.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
-	argos.set_index(["profile", "pres"], inplace=True)
-
-	ds = xr.Dataset.from_dataframe(argos)
-	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
-	ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
-	# for coord in ["lat", "lon", "time"]:
-	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
-	return ds
+	# unique_coords = argos.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
+	# argos.set_index(["profile", "pres"], inplace=True)
+	#
+	# ds = xr.Dataset.from_dataframe(argos)
+	# co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
+	# ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
+	# # for coord in ["lat", "lon", "time"]:
+	# # 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
+	# return ds
+	return convert_to_xr(argos, coords=["lat", "lon", "time"])
 
 
 def preload_argo(parallel: bool = True, regen: bool = False, low_filter: int = 10, high_filter: int = 750, **kwargs) -> str:

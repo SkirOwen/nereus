@@ -27,6 +27,7 @@ from nereus.utils.directories import get_itp_cache_dir, get_itp_dir, get_itp_ext
 from nereus.utils.downloader import downloader
 from nereus.utils.file_ops import calculate_md5
 from nereus.utils.iterable_ops import skipwise
+from nereus.datasets.data_utils import convert_to_xr
 
 
 URL = "https://scienceweb.whoi.edu/itp/data/"
@@ -418,18 +419,18 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> p
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-	unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
-	df_itps.set_index(["profile", "pres"], inplace=True)
 
-	ds = xr.Dataset.from_dataframe(df_itps)
-	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
-	ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
-	return ds
+	# unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
+	# df_itps.set_index(["profile", "pres"], inplace=True)
+	#
+	# ds = xr.Dataset.from_dataframe(df_itps)
+	# co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
+	# ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
+	# return ds
+	return convert_to_xr(df_itps, coords=["lat", "lon", "time"])
 
 
 def preload_itp(clean_df=True, regen: bool = False, **kwargs):
-	# check download
-	# parse
 	save_path = os.path.join(get_itp_cache_dir(), "itps_xr.nc")
 
 	if not os.path.exists(save_path) or regen:
@@ -482,10 +483,6 @@ def main():
 	preload_itp(
 		dims=["temp", "sal", "depth", "dis_oxy"], x_inter=None, base_dim="pres"
 	)
-	# print(itps_path)
-	# meta, itp = parser_all_itp(filtering=False)
-	# print(len(meta))
-	# print(len(itp))
 
 
 if __name__ == "__main__":
