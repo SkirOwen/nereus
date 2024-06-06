@@ -73,23 +73,20 @@ def fit_gmm(args):
 	return aic, bic, sil, gmm_model
 
 
-def cal_AIC_BIC_Si(temp_sal_score: np.ndarray, max_components: int = 20):
-	with Pool(6) as pool:
-		results = list(
-			tqdm(
-				pool.imap(
-					fit_gmm, [(i, temp_sal_score) for i in range(2, max_components)]
-				),
-				total=max_components - 2,
-				desc="Gaussian",
-			)
-		)
+def cal_AIC_BIC_Si(temp_sal_score: np.ndarray, max_components: int = 20) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+	tasks = [(i, temp_sal_score) for i in range(2, max_components)]
+	results = []
+
+	with Pool(6) as pool, tqdm(total=max_components - 2, desc="Gaussians") as pbar:
+		for result in pool.imap(fit_gmm, tasks):
+			results.append(result)
+			pbar.update(1)
 
 	aic, bic, silhouette_scores, models = zip(*results)
 	return aic, bic, silhouette_scores
 
 
-def plot_AIC_BIC_Si(aic, bic, silhouette_scores, max_components: int = 20):
+def plot_AIC_BIC_Si(aic: np.ndarray, bic: np.ndarray, silhouette_scores: np.ndarray, max_components: int = 20) -> None:
 	bic_grad = np.diff(bic)
 	aic_grad = np.diff(aic)
 	silhouette_scores_grad = np.diff(silhouette_scores)
@@ -142,8 +139,9 @@ def gmm(temp_sal_score_full, temp_sal_score_train, n_components: int = 4):
 
 	model.fit(temp_sal_score_train)
 	transformed_data = model.predict(temp_sal_score_full)
+	transformed_proba = model.predict_proba(temp_sal_score_full)
 
-	return transformed_data, model
+	return transformed_data, model, transformed_proba
 
 
 def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
@@ -162,18 +160,16 @@ def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
 	return comps, exp_vars, temp_sal_score
 
 
-def plot_mean_profile_allinone(ds_fit, cmap) -> None:
+def plot_mean_profile_allinone(ds_fit, cmap: list, variables: list[str] | None = None) -> None:
 	"""
 	Plot mean profile for each class in a single figure.
-
-	Args:
-		ds_fit: The input dataset.
 	"""
 
 	unique_labels = np.unique(ds_fit.label.values)
 	num_classes = len(unique_labels)
+	variables = ["temp", "sal"] if variables is None else variables
 
-	fig, axs = plt.subplots(1, 2, figsize=(8, 6), dpi=300)
+	fig, axs = plt.subplots(1, len(variables), figsize=(8, 6), dpi=300)
 	# Define your own color list
 
 	for i in range(num_classes):
@@ -182,34 +178,20 @@ def plot_mean_profile_allinone(ds_fit, cmap) -> None:
 			logger.warning("Skipping a class, make sure your training data is representative of your the entire dataset")
 			continue
 
-		qua5_temp = np.quantile(ds_class["temp"], 0.05, axis=0)
-		qua95_temp = np.quantile(ds_class["temp"], 0.95, axis=0)
-		qua50_temp = np.quantile(ds_class["temp"], 0.50, axis=0)
+		for ax, var in zip(axs, variables):
+			# Compute quantiles
+			qua5 = np.quantile(ds_class[var], 0.05, axis=0)
+			qua50 = np.quantile(ds_class[var], 0.50, axis=0)
+			qua95 = np.quantile(ds_class[var], 0.95, axis=0)
 
-		qua5_salinity = np.quantile(ds_class["sal"], 0.05, axis=0)
-		qua95_salinity = np.quantile(ds_class["sal"], 0.95, axis=0)
-		qua50_salinity = np.quantile(ds_class["sal"], 0.50, axis=0)
+			ax.plot(qua50, ds_fit["pres"].values, c=cmap[i], label=f"Class {i}")
+			ax.fill_betweenx(ds_fit["pres"].values, qua5, qua95, color=cmap[i], alpha=0.5)
+			ax.legend(loc="lower right")
+			ax.set_ylim([np.min(ds_fit["pres"].values), np.max(ds_fit["pres"].values)])
+			ax.set_xlabel("Temperature (°C)" if var == "temp" else "Salinity (g/kg)")
+			ax.invert_yaxis()
 
-		ax = axs[0]
-		ax.plot(qua50_temp, ds_fit["pres"].values, c=cmap[i], label=f"Class {i}")
-		ax.fill_betweenx(ds_fit["pres"].values, qua5_temp, qua95_temp, color=cmap[i], alpha=0.5)
-		ax.legend(loc="lower right")
-		ax.set_ylim([np.min(ds_fit["pres"].values), np.max(ds_fit["pres"].values)])
-		ax.set_ylabel("Pressure (dbar)")
-		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
-		ax.set_xlabel("Temperature (°C)")
-		ax.invert_yaxis()
-
-		ax = axs[1]
-		ax.plot(qua50_salinity, ds_fit["pres"].values, c=cmap[i], label=f"Class {i}")
-		ax.fill_betweenx(ds_fit["pres"].values, qua5_salinity, qua95_salinity, color=cmap[i], alpha=0.5)
-		ax.set_ylim([np.min(ds_fit["pres"].values), np.max(ds_fit["pres"].values)])
-		# ax.legend(loc='lower left')
-		# ax.set_ylabel('Pressure')
-		# ax.set_yticklabels(np.abs(ax.get_yticks()).astype(int))
-		ax.set_ylabel("")
-		ax.set_xlabel("Salinity (g/kg)")
-		ax.invert_yaxis()
+	axs[0].set_ylabel("Pressure (dbar)")
 
 	plt.tight_layout()
 
@@ -242,7 +224,7 @@ def run(benchmark, n_pc, n_gmm):
 	plot_pca_score(ds, comps, exp_vars, n_pc, titles=["temp_train", "sal_train"])
 
 	logger.info("GMM")
-	transformed_data, model = gmm(temp_sal_score_full, temp_sal_score, n_components=n_gmm)
+	transformed_data, model, transformed_proba = gmm(temp_sal_score_full, temp_sal_score, n_components=n_gmm)
 	ds_full["label"] = ("profile", transformed_data)
 
 	if benchmark:
@@ -282,10 +264,10 @@ def main():
 	]
 
 	n_pc = 3
-	n_gmm = 3
-	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm)
+	n_gmm = 6
+	ds_full = run(benchmark=True, n_pc=n_pc, n_gmm=n_gmm)
 
-	plot_mean_profile_allinone(ds_full, cmap=colour_palette)
+	# plot_mean_profile_allinone(ds_full, cmap=colour_palette)
 	# map_arctic_value(
 	# 	ds_full.to_dataframe(),
 	# 	name=f"output_{n_pc}_comp_{n_gmm}_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
