@@ -239,17 +239,13 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -
 	return pd.DataFrame(interp_udash_dict)
 
 
-def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
+def udash_to_xr(udash: pd.DataFrame, coords) -> xr.Dataset:
 	unique_coords = udash.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time", "cruise", "source"]]
 	udash.set_index(["profile", "pres"], inplace=True)
 
 	ds = xr.Dataset.from_dataframe(udash)
 	co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time", "cruise", "source"])
 	ds = xr.merge([ds.drop_vars(['lon', 'cruise', 'lat', 'source', 'time']), co_ds])
-
-	#
-	# for coord in ["lat", "lon", "time", "cruise", "source"]:
-	# 	ds = ds.assign_coords({coord: ("profile", unique_coords[coord])})
 	return ds
 
 
