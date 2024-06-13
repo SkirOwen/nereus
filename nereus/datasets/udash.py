@@ -210,7 +210,7 @@ def process_quality_checks(udash):
 	return udash
 
 
-def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
+def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
 	# or just quickly to pd interp?
 	# That could be a parameter
 
@@ -248,7 +248,7 @@ def preload_udash(regen: bool = False, **kwargs) -> str:
 	save_path = os.path.join(get_udash_dir(), "udash_xr.nc")
 
 	if not os.path.exists(save_path) or regen:
-		if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")):
+		if not os.path.exists(os.path.join(get_udash_dir(), "udash_preprocessed.parquet")) or regen:
 			udash = parse_all_udash()
 			udash.rename(columns=rename_col, inplace=True)
 			logger.info("Parsed")
@@ -276,16 +276,20 @@ def preload_udash(regen: bool = False, **kwargs) -> str:
 
 		logger.info("Saving xr")
 
+		if os.path.exists(save_path):
+			os.remove(save_path)
+
 		ds.to_netcdf(
 			save_path,
 			format="NETCDF4",
 			engine="h5netcdf",
+			mode="w",
 		)
 	return save_path
 
 
 def main():
-	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres")
+	preload_udash(dims=["temp", "sal", "depth"], x_inter=None, base_dim="pres", regen=True)
 
 	# udash = parse_all_udash(filtering=False, remove_argo=False, remove_itp=False)
 	# print(len(udash))
