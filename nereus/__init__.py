@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 
 # This needs to be at the top as other files depend on it
-from .logger import make_logger
-from .config import console
+from .logger import make_logger, console
+# from .config import console
 
 
 __all__ = [
