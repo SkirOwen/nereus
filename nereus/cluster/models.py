@@ -21,27 +21,7 @@ import nereus.datasets
 from nereus import logger
 from nereus.plots.plots import map_arctic_value
 from nereus.utils.directories import get_data_dir, get_plot_dir
-
-
-def get_scaler(value):
-	scaler = StandardScaler()
-	scaler = scaler.fit(value)
-	return scaler
-
-
-def pca_score(value, n_pc: int, scaler):
-	scaled_value = scaler.transform(value)
-
-	pca_model = PCA(n_components=n_pc)
-	fitted_value = pca_model.fit(scaled_value)
-
-	comp = fitted_value.components_
-	exp_var = fitted_value.explained_variance_ratio_
-
-	# score = scaled_value @ comp.T
-	score = pca_model.transform(scaled_value)
-
-	return score, comp, exp_var
+from nereus.processing.data_utils import get_scaler, pca_project
 
 
 def plot_pca_score(data, comps, exp_vars, n_pc, titles):
@@ -62,18 +42,42 @@ def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 	plt.show()
 
 
+def gmm_metrics(fitted_model, data):
+	logger.info("aic")
+	aic = fitted_model.aic(data)
+
+	logger.info("bic")
+	bic = fitted_model.bic(data)
+
+	logger.info("sil")
+	labels = fitted_model.predict(data)
+
+	logger.info(labels.size)
+	sample_size = int(labels.size * 0.20) if labels.size > 10_000 else None
+	sil = silhouette_score(data, labels, n_jobs=2, sample_size=sample_size)
+	return aic, bic, sil
+
+
 def fit_gmm(args):
 	i, temp_sal_score = args
-	gmm_model = GaussianMixture(n_components=i, covariance_type="full")
+	gmm_model = GaussianMixture(n_components=i)
 	gmm_model.fit(temp_sal_score)
-	aic = gmm_model.aic(temp_sal_score)
-	bic = gmm_model.bic(temp_sal_score)
-	labels = gmm_model.predict(temp_sal_score)
-	sil = silhouette_score(temp_sal_score, labels)
+	aic, bic, sil = gmm_metrics(gmm_model, data=temp_sal_score)
 	return aic, bic, sil, gmm_model
 
 
-def cal_AIC_BIC_Si(temp_sal_score: np.ndarray, max_components: int = 20) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def gmm(temp_sal_score_full, temp_sal_score_train, n_components: int = 4, random_state: None | int = None):
+	model = GaussianMixture(n_components=n_components, random_state=random_state)
+	print(model.n_components)
+
+	model.fit(temp_sal_score_train)
+	transformed_data = model.predict(temp_sal_score_full)
+	transformed_proba = model.predict_proba(temp_sal_score_full)
+
+	return transformed_data, model, transformed_proba
+
+
+def gmm_benchmark(temp_sal_score: np.ndarray, max_components: int = 20) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 	tasks = [(i, temp_sal_score) for i in range(2, max_components)]
 	results = []
 
@@ -133,31 +137,20 @@ def plot_AIC_BIC_Si(aic: np.ndarray, bic: np.ndarray, silhouette_scores: np.ndar
 	plt.show()
 
 
-def gmm(temp_sal_score_full, temp_sal_score_train, n_components: int = 4):
-	model = GaussianMixture(n_components=n_components, random_state=0)
-	print(model.n_components)
-
-	model.fit(temp_sal_score_train)
-	transformed_data = model.predict(temp_sal_score_full)
-	transformed_proba = model.predict_proba(temp_sal_score_full)
-
-	return transformed_data, model, transformed_proba
-
-
-def get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal):
+def get_temp_sal_score(ds: xr.Dataset, n_pc: int, scaler_temp, scaler_sal) -> tuple:
 	temp = ds["temp"].values
 	sal = ds["sal"].values
 
 	logger.info("PCA score")
 
-	score_temp, comp_temp, exp_var_temp = pca_score(temp, n_pc=n_pc, scaler=scaler_temp)
-	score_sal, comp_sal, exp_var_sal = pca_score(sal, n_pc=n_pc, scaler=scaler_sal)
+	pca_projection_temp, comp_temp, exp_var_temp = pca_project(temp, n_pc=n_pc, scaler=scaler_temp)
+	pca_projection_sal, comp_sal, exp_var_sal = pca_project(sal, n_pc=n_pc, scaler=scaler_sal)
 
-	comps = np.array([comp_temp, comp_sal])
-	exp_vars = np.array([exp_var_temp, exp_var_sal])
-	temp_sal_score = np.concatenate((score_temp, score_sal), axis=1)
+	temp_sal_comps = np.array([comp_temp, comp_sal])
+	temp_sal_exp_vars = np.array([exp_var_temp, exp_var_sal])
+	temp_sal_score = np.concatenate((pca_projection_temp, pca_projection_sal), axis=1)
 
-	return comps, exp_vars, temp_sal_score
+	return temp_sal_comps, temp_sal_exp_vars, temp_sal_score
 
 
 def plot_mean_profile_allinone(ds_fit, cmap: list, variables: list[str] | None = None) -> None:
@@ -203,7 +196,7 @@ def plot_mean_profile_allinone(ds_fit, cmap: list, variables: list[str] | None =
 	plt.show()
 
 
-def run(benchmark, n_pc, n_gmm):
+def run(benchmark, n_pc, n_gmm, ensemble=False):
 	logger.info("Loading full data")
 	ds_full = nereus.datasets.load_data().load()
 	ds_full = ds_full.dropna(dim="profile", subset=["temp", "sal"], how="any")
@@ -214,9 +207,11 @@ def run(benchmark, n_pc, n_gmm):
 	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
 	# ds = _clean_data(ds)
 
+	logger.info("Scale data")
 	scaler_temp = get_scaler(ds_full["temp"].values)
 	scaler_sal = get_scaler(ds_full["sal"].values)
 
+	logger.info("PCA score")
 	comps, exp_vars, temp_sal_score = get_temp_sal_score(ds, n_pc, scaler_temp, scaler_sal)
 	comps_full, exp_vars_full, temp_sal_score_full = get_temp_sal_score(ds_full, n_pc, scaler_temp, scaler_sal)
 
@@ -225,15 +220,111 @@ def run(benchmark, n_pc, n_gmm):
 
 	logger.info("GMM")
 	transformed_data, model, transformed_proba = gmm(temp_sal_score_full, temp_sal_score, n_components=n_gmm)
+	logger.info("Done, merging")
 	ds_full["label"] = ("profile", transformed_data)
+	metrics_full = gmm_metrics(model, data=temp_sal_score_full)
+	print(metrics_full)
 
 	if benchmark:
 		max_comp = 20
 		logger.info(f"Calculate metrics for {max_comp - 1}")
-		aic, bic, sil = cal_AIC_BIC_Si(temp_sal_score, max_components=max_comp)
+		aic, bic, sil = gmm_benchmark(temp_sal_score, max_components=max_comp)
 		plot_AIC_BIC_Si(aic, bic, sil, max_components=max_comp)
+	else:
+		pass
+
+	if ensemble:
+		aics, bics, sils = ensemble_model(train_data=temp_sal_score, full_data=temp_sal_score_full)
+		plot_ensemble(aics, bics, sils)
 
 	return ds_full
+
+
+def ensemble_model(train_data, full_data, max_comp_per_run: int = 20, nbr_run: int = 10):
+	metrics = []
+	for i in range(nbr_run):
+		metric = gmm_benchmark(train_data, max_comp_per_run)
+		metrics.append(metric)
+	aic, bic, sil = zip(*metrics)
+	return aic, bic, sil
+
+
+def plot_ensemble(aic_ensemble, bic_ensemble, silhouette_scores_ensemble):
+	import seaborn as sns
+
+	# Calculate means and standard deviations
+	aic_mean = np.mean(aic_ensemble, axis=0)
+	aic_std = np.std(aic_ensemble, axis=0)
+
+	bic_mean = np.mean(bic_ensemble, axis=0)
+	bic_std = np.std(bic_ensemble, axis=0)
+
+	silhouette_mean = np.mean(silhouette_scores_ensemble, axis=0)
+	silhouette_std = np.std(silhouette_scores_ensemble, axis=0)
+
+	# Calculate gradients
+	aic_grad_mean = np.diff(aic_mean)
+	aic_grad_std = np.diff(aic_std)
+
+	bic_grad_mean = np.diff(bic_mean)
+	bic_grad_std = np.diff(bic_std)
+
+	silhouette_grad_mean = np.diff(silhouette_mean)
+	silhouette_grad_std = np.diff(silhouette_std)
+
+	fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 11), dpi=300)
+
+	x_range = range(2, 20)
+	x_range_grad = range(2, 20 - 1)
+
+	# Plot AIC with error bars
+	sns.lineplot(ax=axes[0, 0], x=x_range, y=aic_mean, marker="o", label="AIC", ci='sd')
+	axes[0, 0].fill_between(x_range, aic_mean - aic_std, aic_mean + aic_std, alpha=0.3)
+	axes[0, 0].set_xticks(x_range)
+	axes[0, 0].set_ylabel('AIC')
+	axes[0, 0].grid()
+
+	# Plot AIC gradient with error bars
+	sns.lineplot(ax=axes[0, 1], x=x_range_grad, y=aic_grad_mean, marker="o", label="AIC gradient", ci='sd')
+	axes[0, 1].fill_between(x_range_grad, aic_grad_mean - aic_grad_std, aic_grad_mean + aic_grad_std, alpha=0.3)
+	axes[0, 1].set_xticks(x_range_grad)
+	axes[0, 1].set_ylabel('AIC gradient')
+	axes[0, 1].grid()
+
+	# Plot BIC with error bars
+	sns.lineplot(ax=axes[1, 0], x=x_range, y=bic_mean, marker="o", label="BIC", ci='sd')
+	axes[1, 0].fill_between(x_range, bic_mean - bic_std, bic_mean + bic_std, alpha=0.3)
+	axes[1, 0].set_xticks(x_range)
+	axes[1, 0].set_ylabel('BIC')
+	axes[1, 0].grid()
+
+	# Plot BIC gradient with error bars
+	sns.lineplot(ax=axes[1, 1], x=x_range_grad, y=bic_grad_mean, marker="o", label="BIC gradient", ci='sd')
+	axes[1, 1].fill_between(x_range_grad, bic_grad_mean - bic_grad_std, bic_grad_mean + bic_grad_std, alpha=0.3)
+	axes[1, 1].set_xticks(x_range_grad)
+	axes[1, 1].set_ylabel('BIC gradient')
+	axes[1, 1].grid()
+
+	# Plot Silhouette scores with error bars
+	sns.lineplot(ax=axes[2, 0], x=x_range, y=silhouette_mean, marker="o", label="Silhouette coefficient", ci='sd')
+	axes[2, 0].fill_between(x_range, silhouette_mean - silhouette_std, silhouette_mean + silhouette_std, alpha=0.3)
+	axes[2, 0].set_xticks(x_range)
+	axes[2, 0].set_xlabel('Number of components')
+	axes[2, 0].set_ylabel('Silhouette coefficient')
+	axes[2, 0].grid()
+
+	# Plot Silhouette score gradient with error bars
+	sns.lineplot(ax=axes[2, 1], x=x_range_grad, y=silhouette_grad_mean, marker="o",
+	             label="Silhouette coefficient gradient", ci='sd')
+	axes[2, 1].fill_between(x_range_grad, silhouette_grad_mean - silhouette_grad_std,
+	                        silhouette_grad_mean + silhouette_grad_std, alpha=0.3)
+	axes[2, 1].set_xticks(x_range_grad)
+	axes[2, 1].set_xlabel('Number of components')
+	axes[2, 1].set_ylabel('Silhouette coefficient gradient')
+	axes[2, 1].grid()
+
+	plt.subplots_adjust(wspace=0.4, hspace=0.3)
+	plt.show()
 
 
 def _clean_data(ds, ):
@@ -265,7 +356,7 @@ def main():
 
 	n_pc = 3
 	n_gmm = 6
-	ds_full = run(benchmark=True, n_pc=n_pc, n_gmm=n_gmm)
+	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm, ensemble=True)
 
 	# plot_mean_profile_allinone(ds_full, cmap=colour_palette)
 	# map_arctic_value(
