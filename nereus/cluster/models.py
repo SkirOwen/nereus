@@ -43,18 +43,18 @@ def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 
 
 def gmm_metrics(fitted_model, data):
-	logger.info("aic")
+	# logger.info("aic")
 	aic = fitted_model.aic(data)
 
-	logger.info("bic")
+	# logger.info("bic")
 	bic = fitted_model.bic(data)
 
-	logger.info("sil")
+	# logger.info("sil")
 	labels = fitted_model.predict(data)
 
-	logger.info(labels.size)
+	# logger.info(labels.size)
 	sample_size = int(labels.size * 0.20) if labels.size > 10_000 else None
-	sil = silhouette_score(data, labels, n_jobs=2, sample_size=sample_size)
+	sil = silhouette_score(data, labels, n_jobs=1, sample_size=sample_size)
 	return aic, bic, sil
 
 
@@ -242,11 +242,11 @@ def run(benchmark, n_pc, n_gmm, ensemble=False):
 
 def ensemble_model(train_data, full_data, max_comp_per_run: int = 20, nbr_run: int = 10):
 	metrics = []
-	for i in range(nbr_run):
+	for i in tqdm(range(nbr_run), desc="Ensemble"):
 		metric = gmm_benchmark(train_data, max_comp_per_run)
 		metrics.append(metric)
 	aic, bic, sil = zip(*metrics)
-	return aic, bic, sil
+	return np.array(aic), np.array(bic), np.array(sil)
 
 
 def plot_ensemble(aic_ensemble, bic_ensemble, silhouette_scores_ensemble):
@@ -278,35 +278,35 @@ def plot_ensemble(aic_ensemble, bic_ensemble, silhouette_scores_ensemble):
 	x_range_grad = range(2, 20 - 1)
 
 	# Plot AIC with error bars
-	sns.lineplot(ax=axes[0, 0], x=x_range, y=aic_mean, marker="o", label="AIC", ci='sd')
+	sns.lineplot(ax=axes[0, 0], x=x_range, y=aic_mean, marker="o", label="AIC", errorbar='sd')
 	axes[0, 0].fill_between(x_range, aic_mean - aic_std, aic_mean + aic_std, alpha=0.3)
 	axes[0, 0].set_xticks(x_range)
 	axes[0, 0].set_ylabel('AIC')
 	axes[0, 0].grid()
 
 	# Plot AIC gradient with error bars
-	sns.lineplot(ax=axes[0, 1], x=x_range_grad, y=aic_grad_mean, marker="o", label="AIC gradient", ci='sd')
+	sns.lineplot(ax=axes[0, 1], x=x_range_grad, y=aic_grad_mean, marker="o", label="AIC gradient", errorbar='sd')
 	axes[0, 1].fill_between(x_range_grad, aic_grad_mean - aic_grad_std, aic_grad_mean + aic_grad_std, alpha=0.3)
 	axes[0, 1].set_xticks(x_range_grad)
 	axes[0, 1].set_ylabel('AIC gradient')
 	axes[0, 1].grid()
 
 	# Plot BIC with error bars
-	sns.lineplot(ax=axes[1, 0], x=x_range, y=bic_mean, marker="o", label="BIC", ci='sd')
+	sns.lineplot(ax=axes[1, 0], x=x_range, y=bic_mean, marker="o", label="BIC", errorbar='sd')
 	axes[1, 0].fill_between(x_range, bic_mean - bic_std, bic_mean + bic_std, alpha=0.3)
 	axes[1, 0].set_xticks(x_range)
 	axes[1, 0].set_ylabel('BIC')
 	axes[1, 0].grid()
 
 	# Plot BIC gradient with error bars
-	sns.lineplot(ax=axes[1, 1], x=x_range_grad, y=bic_grad_mean, marker="o", label="BIC gradient", ci='sd')
+	sns.lineplot(ax=axes[1, 1], x=x_range_grad, y=bic_grad_mean, marker="o", label="BIC gradient", errorbar='sd')
 	axes[1, 1].fill_between(x_range_grad, bic_grad_mean - bic_grad_std, bic_grad_mean + bic_grad_std, alpha=0.3)
 	axes[1, 1].set_xticks(x_range_grad)
 	axes[1, 1].set_ylabel('BIC gradient')
 	axes[1, 1].grid()
 
 	# Plot Silhouette scores with error bars
-	sns.lineplot(ax=axes[2, 0], x=x_range, y=silhouette_mean, marker="o", label="Silhouette coefficient", ci='sd')
+	sns.lineplot(ax=axes[2, 0], x=x_range, y=silhouette_mean, marker="o", label="Silhouette coefficient", errorbar='sd')
 	axes[2, 0].fill_between(x_range, silhouette_mean - silhouette_std, silhouette_mean + silhouette_std, alpha=0.3)
 	axes[2, 0].set_xticks(x_range)
 	axes[2, 0].set_xlabel('Number of components')
@@ -315,7 +315,7 @@ def plot_ensemble(aic_ensemble, bic_ensemble, silhouette_scores_ensemble):
 
 	# Plot Silhouette score gradient with error bars
 	sns.lineplot(ax=axes[2, 1], x=x_range_grad, y=silhouette_grad_mean, marker="o",
-	             label="Silhouette coefficient gradient", ci='sd')
+	             label="Silhouette coefficient gradient", errorbar='sd')
 	axes[2, 1].fill_between(x_range_grad, silhouette_grad_mean - silhouette_grad_std,
 	                        silhouette_grad_mean + silhouette_grad_std, alpha=0.3)
 	axes[2, 1].set_xticks(x_range_grad)
