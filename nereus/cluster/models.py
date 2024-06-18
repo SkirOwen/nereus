@@ -7,6 +7,7 @@ from multiprocessing import Pool
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import xarray as xr
 
 from sklearn.decomposition import PCA
@@ -18,8 +19,10 @@ from tqdm import tqdm
 import nereus
 import nereus.datasets
 
+from nereus.utils.decorator import panel_logger_decorator
+
 from nereus import logger
-from nereus.plots.plots import map_arctic_value
+from nereus.plots.plots import map_arctic_value, save_and_show
 from nereus.utils.directories import get_data_dir, get_plot_dir
 from nereus.processing.data_utils import get_scaler, pca_project
 
@@ -30,14 +33,13 @@ def plot_pca_score(data, comps, exp_vars, n_pc, titles):
 	for v in range(nbr_values):
 		for i in range(n_pc):
 			axes[v].plot(comps[v][i], data["pres"], label=f"Comp {i}, Exp_var:{exp_vars[v][i]:.2f}")
+
 		axes[v].axvline(x=0, color="grey", linestyle="--")
 		axes[v].set_title(titles[v])
 		axes[v].set_xlabel("PCA Values")
-		if v == 0:
-			axes[v].set_ylabel("Pressure (dbar)")
 		axes[v].invert_yaxis()
-		# set the yticklabels to its absolute values
 		axes[v].legend()
+	axes[0].set_ylabel("Pressure (dbar)")
 	plt.tight_layout()
 	plt.show()
 
@@ -81,7 +83,7 @@ def gmm_benchmark(temp_sal_score: np.ndarray, max_components: int = 20) -> tuple
 	tasks = [(i, temp_sal_score) for i in range(2, max_components)]
 	results = []
 
-	with Pool(6) as pool, tqdm(total=max_components - 2, desc="Gaussians") as pbar:
+	with Pool(6) as pool, tqdm(total=max_components, desc="Gaussians", position=1, leave=False) as pbar:
 		for result in pool.imap(fit_gmm, tasks):
 			results.append(result)
 			pbar.update(1)
@@ -90,51 +92,50 @@ def gmm_benchmark(temp_sal_score: np.ndarray, max_components: int = 20) -> tuple
 	return aic, bic, silhouette_scores
 
 
-def plot_AIC_BIC_Si(aic: np.ndarray, bic: np.ndarray, silhouette_scores: np.ndarray, max_components: int = 20) -> None:
-	bic_grad = np.diff(bic)
-	aic_grad = np.diff(aic)
-	silhouette_scores_grad = np.diff(silhouette_scores)
+def plot_AIC_BIC_Si(aic: np.ndarray, bic: np.ndarray, silhouette_scores: np.ndarray, components: int = 20) -> None:
+	metrics = {
+		"AIC": aic,
+		"BIC": bic,
+		"Silhouette coefficient": silhouette_scores
+	}
+
+	gradients = {
+		"AIC gradient": np.diff(aic),
+		"BIC gradient": np.diff(bic),
+		"Silhouette coefficient gradient": np.diff(silhouette_scores)
+	}
 
 	fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 11), dpi=300)
 
-	axes[0, 0].plot(range(2, max_components), aic)
-	axes[0, 0].set_xticks(range(2, max_components))
-	# axes[0, 0].set_xlabel('Number of components')
-	axes[0, 0].set_ylabel("AIC")
-	axes[0, 0].grid()
+	for i, metric in enumerate(metrics):
+		metric_data = metrics[metric]
+		gradient_data = gradients[f"{metric} gradient"]
 
-	axes[0, 1].plot(range(2, max_components - 1), aic_grad)
-	axes[0, 1].set_xticks(range(2, max_components - 1))
-	# axes[0, 1].set_xlabel('Number of components')
-	axes[0, 1].set_ylabel("AIC gradient")
-	axes[0, 1].grid()
+		# Plot metrics
+		ax_metric = axes[i, 0]
+		sns.lineplot(x=range(2, components), y=metric_data, ax=ax_metric, marker="o")
+		ax_metric.set_xticks(range(2, components))
+		ax_metric.set_ylabel(metric)
+		ax_metric.grid()
 
-	axes[1, 0].plot(range(2, max_components), bic)
-	axes[1, 0].set_xticks(range(2, max_components))
-	# axes[1, 0].set_xlabel('Number of components')
-	axes[1, 0].set_ylabel("BIC")
-	axes[1, 0].grid()
+		# Plot gradient
+		ax_gradient = axes[i, 1]
+		sns.lineplot(x=range(2, components - 1), y=gradient_data, ax=ax_gradient, marker="o")
+		ax_gradient.set_xticks(range(2, components - 1))
+		ax_gradient.set_ylabel(f"{metric} gradient")
+		ax_gradient.grid()
 
-	axes[1, 1].plot(range(2, max_components - 1), bic_grad)
-	axes[1, 1].set_xticks(range(2, max_components - 1))
-	# axes[1, 1].set_xlabel('Number of components')
-	axes[1, 1].set_ylabel("BIC gradient")
-	axes[1, 1].grid()
-
-	axes[2, 0].plot(range(2, max_components), silhouette_scores)
-	axes[2, 0].set_xticks(range(2, max_components))
-	axes[2, 0].set_xlabel("Number of components")
-	axes[2, 0].set_ylabel("Silhouette coefficient")
-	axes[2, 0].grid()
-
-	axes[2, 1].plot(range(2, max_components - 1), silhouette_scores_grad)
-	axes[2, 1].set_xticks(range(2, max_components - 1))
-	axes[2, 1].set_xlabel("Number of components")
-	axes[2, 1].set_ylabel("Silhouette coefficient gradient")
-	axes[2, 1].grid()
+		# Set x labels for the last row
+		if i == 2:
+			ax_metric.set_xlabel("Number of components")
+			ax_gradient.set_xlabel("Number of components")
 
 	plt.subplots_adjust(wspace=0.4, hspace=0.3)
-	plt.show()
+
+	save_and_show(
+		filename=f"AIC-BIC-Sil_gmm-{datetime.datetime.now().strftime('%Y-%m-%d@%H-%M-%S')}",
+		directory=get_plot_dir(),
+	)
 
 
 def get_temp_sal_score(ds: xr.Dataset, n_pc: int, scaler_temp, scaler_sal) -> tuple:
@@ -227,9 +228,9 @@ def run(benchmark, n_pc, n_gmm, ensemble=False):
 
 	if benchmark:
 		max_comp = 20
-		logger.info(f"Calculate metrics for {max_comp - 1}")
+		logger.info(f"Calculate metrics for {max_comp}")
 		aic, bic, sil = gmm_benchmark(temp_sal_score, max_components=max_comp)
-		plot_AIC_BIC_Si(aic, bic, sil, max_components=max_comp)
+		plot_AIC_BIC_Si(aic, bic, sil)
 	else:
 		pass
 
@@ -240,9 +241,9 @@ def run(benchmark, n_pc, n_gmm, ensemble=False):
 	return ds_full
 
 
-def ensemble_model(train_data, full_data, max_comp_per_run: int = 20, nbr_run: int = 10):
+def ensemble_model(train_data, full_data, max_comp_per_run: int = 20, nbr_run: int = 2):
 	metrics = []
-	for i in tqdm(range(nbr_run), desc="Ensemble"):
+	for i in tqdm(range(nbr_run), desc="Ensemble", position=0):
 		metric = gmm_benchmark(train_data, max_comp_per_run)
 		metrics.append(metric)
 	aic, bic, sil = zip(*metrics)
@@ -250,82 +251,43 @@ def ensemble_model(train_data, full_data, max_comp_per_run: int = 20, nbr_run: i
 
 
 def plot_ensemble(aic_ensemble, bic_ensemble, silhouette_scores_ensemble):
-	import seaborn as sns
-
 	# Calculate means and standard deviations
-	aic_mean = np.mean(aic_ensemble, axis=0)
-	aic_std = np.std(aic_ensemble, axis=0)
-
-	bic_mean = np.mean(bic_ensemble, axis=0)
-	bic_std = np.std(bic_ensemble, axis=0)
-
-	silhouette_mean = np.mean(silhouette_scores_ensemble, axis=0)
-	silhouette_std = np.std(silhouette_scores_ensemble, axis=0)
-
-	# Calculate gradients
-	aic_grad_mean = np.diff(aic_mean)
-	aic_grad_std = np.diff(aic_std)
-
-	bic_grad_mean = np.diff(bic_mean)
-	bic_grad_std = np.diff(bic_std)
-
-	silhouette_grad_mean = np.diff(silhouette_mean)
-	silhouette_grad_std = np.diff(silhouette_std)
+	metrics = {
+		'AIC': (np.mean(aic_ensemble, axis=0), np.std(aic_ensemble, axis=0)),
+		'BIC': (np.mean(bic_ensemble, axis=0), np.std(bic_ensemble, axis=0)),
+		'Silhouette coefficient': (
+		np.mean(silhouette_scores_ensemble, axis=0), np.std(silhouette_scores_ensemble, axis=0))
+	}
 
 	fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(12, 11), dpi=300)
-
 	x_range = range(2, 20)
-	x_range_grad = range(2, 20 - 1)
+	x_range_grad = range(2, 19)  # 20 - 1
 
-	# Plot AIC with error bars
-	sns.lineplot(ax=axes[0, 0], x=x_range, y=aic_mean, marker="o", label="AIC", errorbar='sd')
-	axes[0, 0].fill_between(x_range, aic_mean - aic_std, aic_mean + aic_std, alpha=0.3)
-	axes[0, 0].set_xticks(x_range)
-	axes[0, 0].set_ylabel('AIC')
-	axes[0, 0].grid()
+	for i, (label, (mean, std)) in enumerate(metrics.items()):
+		# Plot metric with error bars
 
-	# Plot AIC gradient with error bars
-	sns.lineplot(ax=axes[0, 1], x=x_range_grad, y=aic_grad_mean, marker="o", label="AIC gradient", errorbar='sd')
-	axes[0, 1].fill_between(x_range_grad, aic_grad_mean - aic_grad_std, aic_grad_mean + aic_grad_std, alpha=0.3)
-	axes[0, 1].set_xticks(x_range_grad)
-	axes[0, 1].set_ylabel('AIC gradient')
-	axes[0, 1].grid()
+		sns.lineplot(ax=axes[i, 0], x=x_range, y=mean, marker="o", label=label, errorbar='sd')
+		axes[i, 0].fill_between(x_range, mean - std, mean + std, alpha=0.3)
+		axes[i, 0].set_xticks(x_range)
+		axes[i, 0].set_ylabel(label)
+		axes[i, 0].grid()
 
-	# Plot BIC with error bars
-	sns.lineplot(ax=axes[1, 0], x=x_range, y=bic_mean, marker="o", label="BIC", errorbar='sd')
-	axes[1, 0].fill_between(x_range, bic_mean - bic_std, bic_mean + bic_std, alpha=0.3)
-	axes[1, 0].set_xticks(x_range)
-	axes[1, 0].set_ylabel('BIC')
-	axes[1, 0].grid()
+		# Calculate and plot metric gradient with error bars
+		grad_mean = np.diff(mean)
+		grad_std = np.diff(std)
 
-	# Plot BIC gradient with error bars
-	sns.lineplot(ax=axes[1, 1], x=x_range_grad, y=bic_grad_mean, marker="o", label="BIC gradient", errorbar='sd')
-	axes[1, 1].fill_between(x_range_grad, bic_grad_mean - bic_grad_std, bic_grad_mean + bic_grad_std, alpha=0.3)
-	axes[1, 1].set_xticks(x_range_grad)
-	axes[1, 1].set_ylabel('BIC gradient')
-	axes[1, 1].grid()
+		sns.lineplot(ax=axes[i, 1], x=x_range_grad, y=grad_mean, marker="o", label=label, errorbar='sd')
+		axes[i, 1].fill_between(x_range_grad, grad_mean - grad_std, grad_mean + grad_std, alpha=0.3)
+		axes[i, 1].set_xticks(x_range_grad)
+		axes[i, 1].set_ylabel(f"{label} gradient")
+		axes[i, 1].grid()
 
-	# Plot Silhouette scores with error bars
-	sns.lineplot(ax=axes[2, 0], x=x_range, y=silhouette_mean, marker="o", label="Silhouette coefficient", errorbar='sd')
-	axes[2, 0].fill_between(x_range, silhouette_mean - silhouette_std, silhouette_mean + silhouette_std, alpha=0.3)
-	axes[2, 0].set_xticks(x_range)
-	axes[2, 0].set_xlabel('Number of components')
-	axes[2, 0].set_ylabel('Silhouette coefficient')
-	axes[2, 0].grid()
-
-	# Plot Silhouette score gradient with error bars
-	sns.lineplot(ax=axes[2, 1], x=x_range_grad, y=silhouette_grad_mean, marker="o",
-	             label="Silhouette coefficient gradient", errorbar='sd')
-	axes[2, 1].fill_between(x_range_grad, silhouette_grad_mean - silhouette_grad_std,
-	                        silhouette_grad_mean + silhouette_grad_std, alpha=0.3)
-	axes[2, 1].set_xticks(x_range_grad)
-	axes[2, 1].set_xlabel('Number of components')
-	axes[2, 1].set_ylabel('Silhouette coefficient gradient')
-	axes[2, 1].grid()
+		if i == 2:  # Set x labels for the last row
+			axes[i, 0].set_xlabel('Number of components')
+			axes[i, 1].set_xlabel('Number of components')
 
 	plt.subplots_adjust(wspace=0.4, hspace=0.3)
 	plt.show()
-
 
 def _clean_data(ds, ):
 	ds = ds.dropna(dim="profile", subset=["temp", "sal"], how="any")
@@ -356,7 +318,7 @@ def main():
 
 	n_pc = 3
 	n_gmm = 6
-	ds_full = run(benchmark=False, n_pc=n_pc, n_gmm=n_gmm, ensemble=True)
+	ds_full = run(benchmark=True, n_pc=n_pc, n_gmm=n_gmm, ensemble=False)
 
 	# plot_mean_profile_allinone(ds_full, cmap=colour_palette)
 	# map_arctic_value(
