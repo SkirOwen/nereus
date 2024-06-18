@@ -399,7 +399,7 @@ def parser_all_itp(limit: int = None, **kwargs) -> tuple:
 	return itps, metadata
 
 
-def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str) -> pd.DataFrame:
+def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kwargs) -> pd.DataFrame:
 	# Can remove the nans.
 	# or just quickly to pd interp?
 	# That could be a parameter
