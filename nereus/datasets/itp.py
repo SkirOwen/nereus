@@ -419,14 +419,6 @@ def interp_itps(itp: pd.DataFrame, dims: list[str], x_inter, base_dim: str, **kw
 
 
 def itps_to_xr(df_itps: pd.DataFrame) -> xr.Dataset:
-
-	# unique_coords = df_itps.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time"]]
-	# df_itps.set_index(["profile", "pres"], inplace=True)
-	#
-	# ds = xr.Dataset.from_dataframe(df_itps)
-	# co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time"])
-	# ds = xr.merge([ds.drop_vars(['lat', 'lon', 'time']), co_ds])
-	# return ds
 	return convert_to_xr(df_itps, coords=["lat", "lon", "time"])
 
 
@@ -481,7 +473,7 @@ def preload_itp(clean_df=True, regen: bool = False, **kwargs):
 
 def main():
 	preload_itp(
-		dims=["temp", "sal", "depth", "dis_oxy"], x_inter=None, base_dim="pres"
+		dims=["temp", "sal", "depth", "dis_oxy"], x_inter=None, base_dim="pres", regen=True
 	)
 
 

@@ -234,13 +234,6 @@ def interp_udash(udash: pd.DataFrame, dims: list[str], x_inter, base_dim: str, *
 
 
 def udash_to_xr(udash: pd.DataFrame) -> xr.Dataset:
-	# unique_coords = udash.drop_duplicates("profile").set_index("profile")[["lat", "lon", "time", "cruise", "source"]]
-	# udash.set_index(["profile", "pres"], inplace=True)
-	#
-	# ds = xr.Dataset.from_dataframe(udash)
-	# co_ds = xr.Dataset.from_dataframe(unique_coords).set_coords(["lat", "lon", "time", "cruise", "source"])
-	# ds = xr.merge([ds.drop_vars(['lon', 'cruise', 'lat', 'source', 'time']), co_ds])
-	# return ds
 	return convert_to_xr(udash, coords=['lon', 'cruise', 'lat', 'source', 'time'])
 
 
@@ -276,7 +269,7 @@ def preload_udash(regen: bool = False, **kwargs) -> str:
 
 		logger.info("Saving xr")
 
-		if os.path.exists(save_path):
+		if os.path.exists(save_path):   # Only if regen is true
 			os.remove(save_path)
 
 		ds.to_netcdf(
